@@ -1,6 +1,15 @@
 <?php
 require_once 'header.php';
 require_once 'functions.php';
+
+
+// SERVER-SIDE ROLE CHECK: only Head BHW can access reports
+if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'Head BHW') {
+    // show friendly error and stop executing the rest of the page
+    echo '<div class="alert alert-danger">Access denied. Reports are available to Head BHW only.</div>';
+    require 'footer.php';
+    exit;
+}
 $which = $_GET['which'] ?? 'medicine';
 if ($which === 'medicine') {
     $stmt = $mysqli->prepare('SELECT * FROM medicine');

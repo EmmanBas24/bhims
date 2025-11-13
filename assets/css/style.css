@@ -1,1 +1,267 @@
-/* custom css */
+/* assets/css/style.css - refreshed BHIS look */
+
+/* General page */
+body {
+  font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial;
+  background: #f3f6f9;
+  color: #263238;
+}
+
+/* Topbar */
+.navbar {
+  background: linear-gradient(90deg, #0b4f6c, #083548);
+  color: #fff;
+}
+.navbar .navbar-brand {
+  color: #fff;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+}
+.navbar .btn-outline-secondary {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.15);
+}
+.navbar .btn-outline-secondary:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* Sidebar */
+.sidebar {
+  background: linear-gradient(180deg, #073b4c, #0b5f74);
+  color: #e6f7ff;
+  min-height: calc(100vh - 56px);
+  padding-top: 18px;
+}
+.sidebar .nav-link {
+  color: rgba(230, 247, 255, 0.95);
+  padding: 0.65rem 1rem;
+  border-radius: 8px;
+  margin: 4px 6px;
+  display: flex;
+  align-items: center;
+}
+.sidebar .nav-link:hover,
+.sidebar .nav-link.active {
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+}
+.sidebar .nav-link i {
+  font-size: 1.05rem;
+  width: 26px;
+}
+
+/* Content area */
+.content-wrap {
+  padding: 28px;
+}
+
+/* Stat cards */
+.stat-grid {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+.stat-card {
+  flex: 1 1 260px;
+  background: linear-gradient(180deg, #fff, #fbfdff);
+  border-left: 6px solid #4a90e2;
+  border-radius: 10px;
+  padding: 18px;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.06);
+}
+.stat-card h5 {
+  font-weight: 600;
+  color: #1e293b;
+  margin-bottom: 8px;
+}
+.stat-card .big {
+  font-size: 28px;
+  font-weight: 700;
+  color: #0b4f6c;
+}
+
+/* Different border colors */
+.stat-card.med {
+  border-left-color: #f97316;
+} /* orange */
+.stat-card.sup {
+  border-left-color: #06b6d4;
+} /* teal */
+.stat-card.eq {
+  border-left-color: #7c3aed;
+} /* purple */
+
+/* Low stock alert */
+.alert-low {
+  background: linear-gradient(90deg, #fff6ee, #fff);
+  border-radius: 10px;
+  padding: 12px 16px;
+  border-left: 5px solid #f97316;
+  box-shadow: 0 6px 12px rgba(12, 17, 25, 0.04);
+}
+
+/* Tables */
+.table thead th {
+  background: transparent;
+  color: #0b4f6c;
+  font-weight: 700;
+  border-bottom: 2px solid #e9eef3;
+}
+.table tbody tr td {
+  vertical-align: middle;
+}
+
+/* Recent issued card */
+.recent-card {
+  background: #fff;
+  border-radius: 10px;
+  padding: 14px;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
+}
+
+/* Footer tiny */
+footer {
+  color: #94a3b8;
+  padding: 18px 0;
+}
+
+/* Responsive tweak */
+@media (max-width: 900px) {
+  .stat-grid {
+    flex-direction: column;
+  }
+  .sidebar {
+    width: 100%;
+    min-height: auto;
+  }
+}
+
+/* ---------- Inventory table improvements ---------- */
+
+/* Card wrapper for tables */
+.table-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 14px;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.05);
+  margin-bottom: 18px;
+}
+
+/* Table styles */
+.table.table-modern {
+  border-collapse: separate;
+  border-spacing: 0 10px;
+}
+.table-modern thead th {
+  background: transparent;
+  color: #0b4f6c;
+  font-weight: 700;
+  border: 0;
+  padding: 10px 12px;
+}
+.table-modern tbody tr {
+  background: #fbfdff;
+  border-radius: 8px;
+  box-shadow: 0 3px 8px rgba(10, 20, 30, 0.03);
+}
+.table-modern tbody tr td {
+  vertical-align: middle;
+  padding: 12px;
+  border: 0;
+}
+
+/* Make rows look like 'cards' */
+.table-modern tbody tr + tr td {
+  border-top: 10px solid transparent; /* spacing */
+}
+
+/* Action buttons */
+.action-btn {
+  padding: 6px 8px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+}
+
+/* Status badges: medicine */
+.badge-available {
+  background: #e6f3ff;
+  color: #0b66a6;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-weight: 600;
+}
+.badge-low {
+  background: #fff7ed;
+  color: #b45309;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-weight: 600;
+}
+.badge-expired {
+  background: #fff1f2;
+  color: #9f1239;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-weight: 700;
+}
+
+/* Supplies statuses */
+.badge-out {
+  background: #fff1f0;
+  color: #dc2626;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-weight: 600;
+}
+
+/* Equipment condition */
+.badge-good {
+  background: #ecfeff;
+  color: #0f766e;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-weight: 600;
+}
+.badge-broken {
+  background: #fff7ed;
+  color: #92400e;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-weight: 600;
+}
+.badge-damaged {
+  background: #fff1f2;
+  color: #b91c1c;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-weight: 600;
+}
+
+/* Search/filter form */
+.table-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.table-actions .form-control {
+  min-width: 160px;
+}
+
+/* Responsive */
+@media (max-width: 860px) {
+  .table-modern thead {
+    display: none;
+  }
+  .table-modern tbody tr {
+    display: block;
+    padding: 12px;
+  }
+  .table-modern tbody tr td {
+    display: block;
+    padding: 6px 0;
+  }
+}

@@ -7,7 +7,7 @@ Installation:
 2. Import `database.sql` into your MySQL (phpMyAdmin) to create the `bhis` database and tables.
 3. Edit `config.php` if needed (DB credentials).
 4. Start Apache and MySQL in XAMPP.
-5. Open http://localhost/bhis/index.php
+5. Open
 Default admin: username `admin` password `admin123`
 
 Notes:
