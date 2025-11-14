@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Nov 14, 2025 at 11:33 AM
+-- Generation Time: Nov 14, 2025 at 11:43 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -39,53 +39,17 @@ CREATE TABLE `activity_logs` (
 --
 
 INSERT INTO `activity_logs` (`log_id`, `user_id`, `activity_description`, `timestamp`) VALUES
-(1, 4, 'Logged in', '2025-11-13 19:45:46'),
-(2, 4, 'Logged out', '2025-11-13 19:45:49'),
-(3, 4, 'Logged in', '2025-11-13 19:45:54'),
-(4, 4, 'Added user: RICA', '2025-11-13 20:05:27'),
-(5, 4, 'Logged out', '2025-11-13 20:05:31'),
-(6, 5, 'Logged in', '2025-11-13 20:05:35'),
-(7, 5, 'Updated profile', '2025-11-13 20:58:02'),
-(8, 5, 'Updated profile', '2025-11-13 20:58:03'),
-(9, 5, 'Updated profile', '2025-11-13 20:58:04'),
-(10, 5, 'Updated profile', '2025-11-13 20:58:05'),
-(11, 5, 'Logged out', '2025-11-13 21:02:50'),
-(12, 4, 'Logged in', '2025-11-13 21:02:55'),
-(13, 4, 'Issued 10 x Vitamin C 500mg to EMMAN BAS', '2025-11-13 21:04:39'),
-(14, 4, 'Added user: BWHAdmin', '2025-11-13 21:25:05'),
-(15, 4, 'Logged out', '2025-11-13 21:25:22'),
-(16, 4, 'Logged in', '2025-11-13 21:25:33'),
-(17, 4, 'Updated user ID 8', '2025-11-13 21:32:01'),
-(18, 4, 'Updated user ID 8', '2025-11-13 21:32:11'),
-(19, 8, 'Logged in', '2025-11-13 21:32:32'),
-(20, 8, 'Updated supply ID 4', '2025-11-13 21:35:04'),
-(21, 4, 'Updated user ID 8', '2025-11-13 21:35:59'),
-(22, 8, 'Deleted medicine ID 12', '2025-11-13 21:38:32'),
-(23, 4, 'Updated medicine ID 9', '2025-11-13 21:42:35'),
-(24, 4, 'Updated medicine ID 10', '2025-11-13 22:18:09'),
-(25, 4, 'Updated medicine ID 9', '2025-11-13 22:18:17'),
-(26, 4, 'Updated medicine ID 11', '2025-11-13 22:18:55'),
-(27, 4, 'Updated medicine ID 11', '2025-11-13 22:33:17'),
-(28, 4, 'Updated medicine ID 9', '2025-11-13 22:33:21'),
-(29, 4, 'Updated medicine ID 10', '2025-11-13 22:33:27'),
-(30, 4, 'Deleted equipment ID 4', '2025-11-13 22:50:40'),
-(31, 4, 'Issued 1 x asdad to ', '2025-11-13 22:54:43'),
-(32, 8, 'Logged in', '2025-11-13 23:03:54'),
-(33, 4, 'Updated profile details', '2025-11-13 23:05:04'),
-(34, 4, 'Updated supply ID 4', '2025-11-13 23:37:27'),
-(35, 4, 'Logged in', '2025-11-14 00:57:44'),
-(36, 4, 'Deleted supply ID 3', '2025-11-14 02:23:31'),
-(37, 4, 'Deleted issuance ID 2', '2025-11-14 03:36:58'),
-(38, 4, 'Deleted issuance ID 1', '2025-11-14 03:37:00'),
-(39, 4, 'Logged out', '2025-11-14 18:08:31'),
-(40, 4, 'Logged in', '2025-11-14 18:11:35'),
-(41, 4, 'Logged out', '2025-11-14 18:14:25'),
-(42, 4, 'Logged in', '2025-11-14 18:18:58'),
-(43, 4, 'Added user: rein', '2025-11-14 18:19:27'),
-(44, 4, 'Logged out', '2025-11-14 18:19:29'),
-(45, 9, 'Logged in', '2025-11-14 18:19:42'),
-(46, 9, 'Logged out', '2025-11-14 18:20:49'),
-(47, 4, 'Logged in', '2025-11-14 18:21:06');
+(1, 4, 'Logged in', '2025-11-15 05:08:38'),
+(2, 4, 'Issued 20 x Syringes 3ml to Jode Somera', '2025-11-15 05:58:15'),
+(3, 4, 'Logged out', '2025-11-15 06:25:48'),
+(4, 4, 'Logged in', '2025-11-15 06:26:28'),
+(5, 4, 'Added user: Rein', '2025-11-15 06:26:53'),
+(6, 4, 'Logged out', '2025-11-15 06:26:55'),
+(7, 16, 'Logged in', '2025-11-15 06:26:59'),
+(8, 16, 'Logged out', '2025-11-15 06:28:20'),
+(9, 4, 'Logged in', '2025-11-15 06:28:26'),
+(10, 4, 'Added medicine: Paracetamol', '2025-11-15 06:29:57'),
+(11, 4, 'Issued 60 x Paracetamol to Adam', '2025-11-15 06:34:44');
 
 -- --------------------------------------------------------
 
@@ -111,10 +75,14 @@ CREATE TABLE `equipment` (
 --
 
 INSERT INTO `equipment` (`equipment_id`, `item_code`, `item_name`, `quantity`, `supplier`, `condition`, `status`, `updated_at`, `date_received`, `added_by`) VALUES
-(5, 'EQ-001', 'Blood Pressure Monitor', 1, 'MedTech Solutions', 'Good', 'Available', '2025-11-14 04:04:38', '2025-02-01', 4),
-(6, 'EQ-002', 'Stethoscope', 1, 'DoctorLine', 'Good', 'Available', '2025-11-14 04:04:38', '2025-01-20', 4),
-(7, 'EQ-003', 'Weighing Scale', 1, 'HealthEquip', 'Broken', 'Unavailable', '2025-11-14 04:04:38', '2025-01-10', 4),
-(8, 'EQ-004', 'Nebulizer Machine', 1, 'AirMed Supply', 'Damaged', 'Unavailable', '2025-11-14 04:04:38', '2025-01-14', 4);
+(9, 'EQ-001', 'Blood Pressure Monitor (BP Set)', 1, 'MedServe Supply', 'Good', 'Available', '2025-11-15 03:33:19', '2025-01-15', 10),
+(10, 'EQ-002', 'Stethoscope', 1, 'Wellness Medical', 'Good', 'Available', '2025-11-15 03:33:19', '2025-01-15', 11),
+(11, 'EQ-003', 'Thermometer (Digital)', 1, 'HealthLine Devices', 'Good', 'Available', '2025-11-15 03:33:19', '2025-01-15', 12),
+(12, 'EQ-004', 'Nebulizer Machine', 1, 'AirLife Medical', 'Good', 'Available', '2025-11-15 03:33:19', '2025-01-15', 13),
+(13, 'EQ-005', 'Weighing Scale (Adult)', 1, 'MedEquip Center', 'Good', 'Available', '2025-11-15 03:33:19', '2025-01-15', 14),
+(14, 'EQ-006', 'Weighing Scale (Infant)', 1, 'BabyCare Medical', 'Good', 'Available', '2025-11-15 03:33:19', '2025-01-15', 10),
+(15, 'EQ-007', 'Glucometer Set', 1, 'LifeCheck Diagnostics', 'Good', 'Available', '2025-11-15 03:33:19', '2025-01-15', 11),
+(16, 'EQ-008', 'Oxygen Tank (Portable)', 1, 'AirMed Supply', 'Good', 'Available', '2025-11-15 03:33:19', '2025-01-15', 12);
 
 -- --------------------------------------------------------
 
@@ -141,10 +109,13 @@ CREATE TABLE `issuance` (
 INSERT INTO `issuance` (`issue_id`, `category`, `item_code`, `item_name`, `quantity_issued`, `issued_to`, `purpose`, `issued_by`, `date_issued`) VALUES
 (3, 'Medicine', 'MED-001', 'Paracetamol', 10, 'Juan Dela Cruz', 'Fever Treatment', 4, '2025-02-11 00:00:00'),
 (4, 'Medicine', 'MED-002', 'Amoxicillin', 5, 'Maria Santos', 'Antibiotic Dose', 4, '2025-02-09 00:00:00'),
-(7, 'Medicine', 'MED-003', 'ORS Solution', 8, 'JODE ', 'Diarrhea Response', 4, '2025-02-04 00:00:00'),
 (8, 'Medicine', 'MED-001', 'Paracetamol', 12, 'Pedro Dela Cruz', 'Headache relief', 4, '2024-11-02 00:00:00'),
 (9, 'Medicine', 'MED-002', 'Amoxicillin', 8, 'Ana Martinez', 'Antibiotic treatment', 4, '2024-11-03 00:00:00'),
-(12, 'Medicine', 'MED-004', 'Cough Syrup', 6, 'Jomar Reyes', 'Cough remedy', 4, '2024-11-06 00:00:00');
+(12, 'Medicine', 'MED-004', 'Cough Syrup', 6, 'Jomar Reyes', 'Cough remedy', 4, '2024-11-06 00:00:00'),
+(30, 'Supply', 'SUP-001', 'Cotton Balls', 200, 'EMMAN BAS', 'STAFF USED', 4, '2025-11-15 00:52:09'),
+(32, 'Medicine', 'MED-001', 'Paracetamol', 200, 'Patient ', 'fever', 15, '2025-11-15 03:24:45'),
+(33, 'Supply', 'SUP-002', 'Syringes 3ml', 20, 'Jode Somera', 'Patient needs', 4, '2025-11-15 05:58:15'),
+(34, 'Medicine', 'MED-009', 'Paracetamol', 60, 'Adam', 'fever', 4, '2025-11-15 06:34:44');
 
 -- --------------------------------------------------------
 
@@ -173,10 +144,15 @@ CREATE TABLE `medicine` (
 --
 
 INSERT INTO `medicine` (`med_id`, `item_code`, `item_name`, `dosage`, `expiry_date`, `quantity`, `category`, `supplier`, `status`, `date_received`, `added_by`, `created_at`, `updated_at`) VALUES
-(13, 'MED-001', 'Paracetamol', '500 mg', '2026-05-12', 150, 'Adult', 'UNILAB', 'Available', '2025-02-10', 4, '2025-11-13 20:04:38', '2025-11-13 20:04:38'),
-(14, 'MED-002', 'Amoxicillin', '250 mg', '2026-11-30', 80, 'Pediatric', 'Mercury Pharma', 'Available', '2025-02-02', 4, '2025-11-13 20:04:38', '2025-11-13 20:04:38'),
-(15, 'MED-003', 'ORS Solution', '500 ml', '2027-01-15', 60, 'General', 'HydraLife', 'Available', '2025-01-21', 4, '2025-11-13 20:04:38', '2025-11-13 20:04:38'),
-(16, 'MED-004', 'Cough Syrup', '120 ml', '2025-12-10', 40, 'Child', 'PharmaHealth', 'Low Stock', '2025-01-28', 4, '2025-11-13 20:04:38', '2025-11-13 20:04:38');
+(17, 'MED-001', 'Paracetamol', '500mg', '2026-12-31', 0, 'Tablet', 'Zuellig Pharma', 'Available', '2025-01-10', 10, '2025-11-14 19:23:11', '2025-11-14 19:23:11'),
+(18, 'MED-002', 'Ibuprofen', '400mg', '2027-03-15', 150, 'Tablet', 'Unilab', 'Available', '2025-01-10', 11, '2025-11-14 19:23:11', '2025-11-14 19:23:11'),
+(19, 'MED-003', 'Amoxicillin', '500mg', '2026-10-20', 180, 'Capsule', 'Pfizer', 'Available', '2025-01-10', 12, '2025-11-14 19:23:11', '2025-11-14 19:23:11'),
+(20, 'MED-004', 'Co-trimoxazole', '800mg/160mg', '2027-04-05', 120, 'Tablet', 'Roche', 'Available', '2025-01-10', 13, '2025-11-14 19:23:11', '2025-11-14 19:23:11'),
+(21, 'MED-005', 'ORS Powder', 'Standard Pack', '2028-01-30', 250, 'Powder', 'NutriAsia Medical', 'Available', '2025-01-10', 14, '2025-11-14 19:23:11', '2025-11-14 19:23:11'),
+(22, 'MED-006', 'Cetirizine', '10mg', '2027-08-21', 160, 'Tablet', 'Unilab', 'Available', '2025-01-10', 10, '2025-11-14 19:23:11', '2025-11-14 19:23:11'),
+(23, 'MED-007', 'Ferrous Sulfate', '325mg', '2026-11-18', 300, 'Tablet', 'PharmaTech', 'Available', '2025-01-10', 11, '2025-11-14 19:23:11', '2025-11-14 19:23:11'),
+(24, 'MED-008', 'Mefenamic Acid', '500mg', '2027-02-10', 140, 'Capsule', 'Lloyd Laboratories', 'Available', '2025-01-10', 12, '2025-11-14 19:23:11', '2025-11-14 19:23:11'),
+(25, 'MED-009', 'Paracetamol', '500 mg', '2025-12-25', 0, 'Adult', 'LGU mingla', 'Available', '0000-00-00', 4, '2025-11-14 22:29:56', NULL);
 
 -- --------------------------------------------------------
 
@@ -201,10 +177,18 @@ CREATE TABLE `supplies` (
 --
 
 INSERT INTO `supplies` (`supply_id`, `item_code`, `item_name`, `quantity`, `supplier`, `status`, `updated_at`, `date_received`, `added_by`) VALUES
-(5, 'SUP-001', 'Cotton Balls', 200, 'MedSupply Co.', 'Available', '2025-11-14 04:04:38', '2025-02-06', 4),
-(6, 'SUP-002', 'Syringes 3ml', 120, 'Medical Depot', 'Available', '2025-11-14 04:04:38', '2025-02-02', 4),
+(5, 'SUP-001', 'Cotton Balls', 0, 'MedSupply Co.', 'Available', '2025-11-14 04:04:38', '2025-02-06', 4),
+(6, 'SUP-002', 'Syringes 3ml', 100, 'Medical Depot', 'Available', '2025-11-14 04:04:38', '2025-02-02', 4),
 (7, 'SUP-003', 'Face Masks', 300, 'HealthGuard', 'Available', '2025-11-14 04:04:38', '2025-01-30', 4),
-(8, 'SUP-004', 'Alcohol 70%', 90, 'CleanMed', 'Low Stock', '2025-11-14 04:04:38', '2025-01-26', 4);
+(8, 'SUP-004', 'Alcohol 70%', 90, 'CleanMed', 'Low Stock', '2025-11-14 04:04:38', '2025-01-26', 4),
+(9, 'SUP-001', 'Syringes (3ml)', 40, 'Zuellig Pharma', 'Available', '2025-11-15 03:28:45', '2025-01-12', 10),
+(10, 'SUP-002', 'Alcohol 70%', 12, 'Unilab', 'Available', '2025-11-15 03:28:45', '2025-01-12', 11),
+(11, 'SUP-003', 'Cotton Balls', 20, 'MedLine Supply', 'Available', '2025-11-15 03:28:45', '2025-01-12', 12),
+(12, 'SUP-004', 'Face Masks (Disposable)', 50, 'HealthGuard Corp', 'Available', '2025-11-15 03:28:45', '2025-01-12', 13),
+(13, 'SUP-005', 'Gloves (Latex)', 30, 'Glovetech Medical', 'Available', '2025-11-15 03:28:45', '2025-01-12', 14),
+(14, 'SUP-006', 'Bandages (Elastic)', 15, 'Lifeline Medical', 'Available', '2025-11-15 03:28:45', '2025-01-12', 10),
+(15, 'SUP-007', 'Thermometer Strips', 25, 'MedicTrust', 'Available', '2025-11-15 03:28:45', '2025-01-12', 11),
+(16, 'SUP-008', 'BP Cuff Replacement Parts', 8, 'Wellness Medical', 'Available', '2025-11-15 03:28:45', '2025-01-12', 12);
 
 -- --------------------------------------------------------
 
@@ -227,10 +211,14 @@ CREATE TABLE `users` (
 --
 
 INSERT INTO `users` (`user_id`, `name`, `username`, `password`, `role`, `status`, `date_created`) VALUES
-(4, 'CHANNNN', 'admin', '$2y$10$zNWlWN3WDo5CH5Vl.M9JQ.Ztq5IHfJcJ7nVoLTY5EtOyuMEe71Mku', 'Head BHW', 'Active', '2025-11-13 19:45:41'),
-(5, 'Rica Mae', 'RICA', '$2y$10$XfaEEqKumJSoL1SspD/ZX.Jnk8FJXlSM.utLrm8YJCkMwl3sEa4EC', 'BHW', 'Active', '2025-11-13 20:05:27'),
-(8, 'Worker', 'user', '$2y$10$zNWlWN3WDo5CH5Vl.M9JQ.Ztq5IHfJcJ7nVoLTY5EtOyuMEe71Mku', 'BHW', 'Active', '2025-11-13 21:25:05'),
-(9, 'REIN CORONADO', 'rein', '$2y$10$EtYrU0eYN9d18GXKatnl1eG2opCO2DRm.kO/6y07qqJQN34BvMKX2', 'BHW', 'Active', '2025-11-14 18:19:27');
+(4, 'Aaron', 'Aaron', '$2y$10$zlN8ApjKmE2pjXdHgPleZePqH8FHbrKABsHwinKhnoZvJcCvcu/1e', 'Head BHW', 'Active', '2025-11-13 19:45:41'),
+(10, 'Maria Lopez', 'bhw_mlopez', 'password123', 'BHW', 'Active', '2025-11-15 03:06:49'),
+(11, 'Ana Dela Cruz', 'bhw_adcruz', 'password123', 'BHW', 'Active', '2025-11-15 03:06:49'),
+(12, 'Joan Ramirez', 'bhw_jramirez', 'password123', 'BHW', 'Active', '2025-11-15 03:06:49'),
+(13, 'Ella Santiago', 'bhw_esantiago', 'password123', 'BHW', 'Active', '2025-11-15 03:06:49'),
+(14, 'Grace Villanueva', 'bhw_gvillanueva', 'password123', 'BHW', 'Active', '2025-11-15 03:06:49'),
+(15, 'HEAD', 'HEAD', '$2y$10$1uWiFCs1caRt0y3eqhuAJu.1G2qEWw2BO2aCNekQ/ad7bo4qGgaVC', 'Head BHW', 'Active', '2025-11-15 03:08:26'),
+(16, 'BHW', 'Rein', '$2y$10$gRXXwLYIjFihpvGRzb1uH.dmZpCU6imEfn4FlQIwjjnCFNkdKkPWi', 'BHW', 'Active', '2025-11-15 06:26:53');
 
 --
 -- Indexes for dumped tables
@@ -286,37 +274,37 @@ ALTER TABLE `users`
 -- AUTO_INCREMENT for table `activity_logs`
 --
 ALTER TABLE `activity_logs`
-  MODIFY `log_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=48;
+  MODIFY `log_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=12;
 
 --
 -- AUTO_INCREMENT for table `equipment`
 --
 ALTER TABLE `equipment`
-  MODIFY `equipment_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
+  MODIFY `equipment_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=17;
 
 --
 -- AUTO_INCREMENT for table `issuance`
 --
 ALTER TABLE `issuance`
-  MODIFY `issue_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=28;
+  MODIFY `issue_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=35;
 
 --
 -- AUTO_INCREMENT for table `medicine`
 --
 ALTER TABLE `medicine`
-  MODIFY `med_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=17;
+  MODIFY `med_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=26;
 
 --
 -- AUTO_INCREMENT for table `supplies`
 --
 ALTER TABLE `supplies`
-  MODIFY `supply_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
+  MODIFY `supply_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=17;
 
 --
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `user_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
+  MODIFY `user_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=17;
 
 --
 -- Constraints for dumped tables

@@ -38,7 +38,7 @@ if ($action === 'edit' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $role = $_POST['role'] ?? 'BHW';
     $status = $_POST['status'] ?? 'Active';
 
-    $stmt = $mysqli->prepare('UPDATE users SET name=?,username=?,role=?,status=?,updated_at=NOW() WHERE user_id=?');
+    $stmt = $mysqli->prepare('UPDATE users SET name=?,username=?,role=?,status=? WHERE user_id=?');
     if ($stmt === false) { die('Prepare failed: ' . $mysqli->error); }
     $stmt->bind_param('ssssi', $name, $username, $role, $status, $id);
     $stmt->execute();

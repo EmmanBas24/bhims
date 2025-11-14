@@ -346,4 +346,4 @@ if (!empty($user['name'])) {
 })();
 </script>
 
-<?php require 'footer.php'; ?>
+

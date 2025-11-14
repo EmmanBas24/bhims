@@ -13,197 +13,278 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'Head BHW') {
 
 $user_id = $_SESSION['user_id'] ?? null;
 
-// categories available for filters
-$categories = ['Medicine', 'Supply'];
+/* ---------------------------
+   Helper DB functions
+   --------------------------- */
 
-// fetch distinct months present in issuance (format: YYYY-MM) for the month filter dropdown
-$month_options = [];
-$mstmt = $mysqli->prepare("SELECT DISTINCT DATE_FORMAT(date_issued, '%Y-%m') AS ym FROM issuance WHERE date_issued IS NOT NULL ORDER BY ym DESC");
-if ($mstmt !== false) {
-    $mstmt->execute();
-    $mres = $mstmt->get_result();
-    while ($r = $mres->fetch_assoc()) {
-        if (!empty($r['ym'])) $month_options[] = $r['ym'];
+/**
+ * Check whether a table exists (uses escaped literal)
+ */
+function table_exists($mysqli, $table) {
+    $tbl_esc = $mysqli->real_escape_string($table);
+    $sql = "SHOW TABLES LIKE '{$tbl_esc}'";
+    $res = $mysqli->query($sql);
+    if ($res === false) return false;
+    $exists = ($res->num_rows > 0);
+    $res->free();
+    return $exists;
+}
+
+/**
+ * Check whether a column exists in a table
+ */
+function column_exists($mysqli, $table, $column) {
+    $tbl_esc = $mysqli->real_escape_string($table);
+    $col_esc = $mysqli->real_escape_string($column);
+    $sql = "SHOW COLUMNS FROM `{$tbl_esc}` LIKE '{$col_esc}'";
+    $res = $mysqli->query($sql);
+    if ($res === false) return false;
+    $exists = ($res->num_rows > 0);
+    $res->free();
+    return $exists;
+}
+
+/* ---------------------------
+   Inventory gathering (AGGREGATED by item_name ONLY)
+   Replaces the previous per-row batch reading.
+   --------------------------- */
+
+$inventory_rows = [];
+
+$inv_tables = [
+    ['table' => 'medicine',  'category' => 'Medicine',  'id_col' => 'med_id'],
+    ['table' => 'supplies',  'category' => 'Supply',    'id_col' => 'supply_id'],
+    ['table' => 'equipment', 'category' => 'Equipment', 'id_col' => 'equipment_id'],
+];
+
+foreach ($inv_tables as $it) {
+    $tbl = $it['table'];
+
+    if (!table_exists($mysqli, $tbl)) continue;
+
+    // ensure expected columns exist (defensive)
+    if (!column_exists($mysqli, $tbl, 'item_name') || !column_exists($mysqli, $tbl, 'quantity')) {
+        continue;
     }
-    $mstmt->close();
+
+    $tbl_esc = $mysqli->real_escape_string($tbl);
+
+    // AGGREGATED QUERY – GROUP BY item_name only
+    $sel = "
+        SELECT 
+            item_name,
+            COALESCE(SUM(CAST(quantity AS DECIMAL(12,4))),0) AS total_qty
+        FROM `{$tbl_esc}`
+        GROUP BY item_name
+    ";
+
+    $res = $mysqli->query($sel);
+    if ($res) {
+        while ($r = $res->fetch_assoc()) {
+            $inventory_rows[] = [
+                'category'  => $it['category'],
+                'item_name' => $r['item_name'] ?? '',
+                'item_code' => '',  // grouping by item_name only; codes omitted for summary
+                'quantity'  => is_null($r['total_qty']) ? 0 : (float)$r['total_qty'],
+            ];
+        }
+        $res->free();
+    } else {
+        // Optional: enable during debugging
+        // error_log("Inventory aggregate query failed for {$tbl_esc}: " . $mysqli->error);
+    }
 }
 
-// Filters (category and month)
-$category_filter = $_GET['category'] ?? '';
-$month_filter = $_GET['month'] ?? ''; // expected YYYY-MM, if empty fall back to current month
-if ($month_filter === '') {
-    // default to current month in YYYY-MM so dropdown shows something
-    $month_filter = date('Y-m');
-}
+/* ---------------------------
+   Prepare stock in/out arrays
+   (NO pagination — show all rows)
+   --------------------------- */
 
-// Build query with optional filters
-$sql = "SELECT i.*, u.name as issuer
-        FROM issuance i
-        LEFT JOIN users u ON i.issued_by = u.user_id
-        WHERE 1=1";
-$params = [];
-$types = '';
+$stock_in_all  = array_values(array_filter($inventory_rows, function($r){ return $r['quantity'] > 0; }));
+$stock_out_all = array_values(array_filter($inventory_rows, function($r){ return $r['quantity'] == 0; }));
 
-if ($category_filter !== '') {
-    $sql .= " AND i.category = ?";
-    $params[] = $category_filter;
-    $types .= 's';
-}
-if ($month_filter !== '') {
-    $sql .= " AND DATE_FORMAT(i.date_issued, '%Y-%m') = ?";
-    $params[] = $month_filter;
-    $types .= 's';
-}
+$stock_in  = $stock_in_all;   // show all rows
+$stock_out = $stock_out_all;  // show all rows
 
-$sql .= " ORDER BY i.date_issued DESC, i.issue_id DESC";
+$stock_in_total  = count($stock_in);
+$stock_out_total = count($stock_out);
 
-$stmt = $mysqli->prepare($sql);
-if ($stmt === false) { die('Prepare failed: ' . $mysqli->error); }
-if (!empty($params)) {
-    $stmt->bind_param($types, ...$params);
-}
-$stmt->execute();
-$rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
-$stmt->close();
+/* ---------------------------
+   Header info (Asia/Manila)
+   --------------------------- */
+$tz = new DateTimeZone('Asia/Manila');
+$now = new DateTime('now', $tz);
+$reportDate = $now->format('F j, Y');
 
-// map month YYYY-MM to label for header if possible
-$displayMonthLabel = '';
-if (!empty($month_filter)) {
-    $dt = DateTime::createFromFormat('!Y-m', $month_filter);
-    if ($dt) $displayMonthLabel = $dt->format('F Y');
-    else $displayMonthLabel = $month_filter;
-}
 ?>
 
-<!-- Styles: reuse issuance card/table/modal system -->
+<!-- Minimal / print-first styles -->
 <style>
-  /* Print tweaks */
-  @media print {
-    .no-print, nav, .bg-light, .sidebar, .btn, .form-control, .form-select { display: none !important; }
-    body { background: white; }
+  /* Page and print rules */
+  @page {
+    size: auto;
+    margin: 12mm;
   }
 
-  .table-card { background:#fff; border-radius:10px; padding:1rem; box-shadow:0 8px 24px rgba(0,0,0,0.06); }
-  .d-flex{display:flex}.justify-content-between{justify-content:space-between}.align-items-center{align-items:center}
-  .mb-2{margin-bottom:.5rem}.btn{display:inline-flex;align-items:center;gap:.5rem;padding:.375rem .6rem;border-radius:6px;border:1px solid transparent;text-decoration:none;cursor:pointer}
-  .btn-sm{font-size:.85rem;padding:.275rem .5rem;border-radius:6px}
-  .btn-primary{background:#0d6efd;color:#fff;border-color:#0d6efd}
-  .btn-success{background:#198754;color:#fff;border-color:#198754}
-  .btn-secondary{background:#6c757d;color:#fff;border-color:#6c757d}
-  .btn-danger{background:#dc3545;color:#fff;border-color:#dc3545}
-  .btn-outline-secondary{background:transparent;color:#495057;border-color:#ced4da}
+  /* Hide site chrome when printing */
+  @media print {
+    .no-print, nav, header, footer, .sidebar, .btn, .form-control, .form-select, .no-print-on-print { display: none !important; }
+    body { background: #fff; color: #000; }
+    /* Ensure table headers repeat on each page */
+    thead { display: table-header-group; }
+    tfoot { display: table-row-group; }
+  }
 
-  .badge-med{display:inline-block;padding:.25rem .5rem;border-radius:999px;background:#e6f4ff;color:#0b5bd7;font-weight:600;font-size:.82rem}
-  .badge-sup{display:inline-block;padding:.25rem .5rem;border-radius:999px;background:#eaf6ea;color:#0b7a3a;font-weight:600;font-size:.82rem}
+  /* Page / screen layout */
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; color:#222; background:transparent; margin: 12px; }
+  .report-header { margin-bottom: 8px; }
+  .report-title { font-size: 18px; margin:0 0 4px 0; font-weight:700; }
+  .report-meta { font-size: 13px; color:#444; margin-bottom: 12px; }
 
-  label{display:block;font-size:.9rem;margin-bottom:.25rem;color:#333}
-  input.form-control,select.form-control,textarea.form-control{width:100%;padding:.45rem .5rem;border:1px solid #dfe3e6;border-radius:6px}
-  .table-modern{width:100%;border-collapse:collapse}
-  .table-modern th, .table-modern td {padding:.6rem .5rem;border-bottom:1px solid #f1f3f5;text-align:left;vertical-align:middle}
-  .table-responsive{overflow:auto}
+  /* Clean, plain table - visible borders */
+  table.plain-table {
+    width:100%;
+    border-collapse: collapse;
+    border-spacing:0;
+    margin-bottom: 18px;
+    font-size: 13px;
+    color: #222;
+
+    /* visible outer border */
+    border: 1px solid #bdbdbd;
+    /* rounded look on screen only */
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  /* table header cells - stronger separators */
+  table.plain-table thead th {
+    text-align: left;
+    padding: 8px 6px;
+    font-weight:700;
+    background: #f7f7f7;
+    vertical-align: bottom;
+
+    /* header cell borders */
+    border-bottom: 1px solid #bdbdbd;
+    border-right: 1px solid #e0e0e0;
+  }
+
+  /* last header cell shouldn't have right border */
+  table.plain-table thead th:last-child { border-right: none; }
+
+  /* body cell borders for clear rows */
+  table.plain-table tbody td {
+    padding: 8px 6px;
+    vertical-align: middle;
+    border-top: 1px solid #e9e9e9;
+    border-right: 1px solid #f1f1f1;
+  }
+  table.plain-table tbody td:last-child { border-right: none; }
+
+  /* Make sure the table rows remain visually separated on print */
+  table.plain-table tbody tr { background: #fff; }
+
+  /* Prevent row splitting across printed pages, but allow page breaks between rows */
+  tr, td, th {
+    page-break-inside: avoid;
+    break-inside: avoid;
+    -webkit-column-break-inside: avoid;
+    -webkit-region-break-inside: avoid;
+  }
+
+  /* Small helpers */
+  .muted { color:#555; font-size:13px; }
+  .section-title { font-size:14px; font-weight:700; margin:8px 0; }
+  .screen-actions { margin-bottom:12px; }
+  .print-note { font-size:12px; color:#666; margin-top:6px; }
+
+  /* Make sure code column doesn't wrap awkwardly */
+  .col-code { white-space:nowrap; max-width: 180px; overflow:hidden; text-overflow:ellipsis; }
+
+  /* When printing, avoid any shadows/borders from outer layout — neutralize common classes if present */
+  .card, .table-card, .shadow { box-shadow: none !important; background: transparent !important; border: none !important; }
+
+  /* Responsive: keep layout readable on small screens */
+  @media (max-width:700px) {
+    table.plain-table thead th, table.plain-table tbody td { padding: 6px 4px; font-size: 12px; }
+    .report-title { font-size: 16px; }
+  }
 </style>
 
-<h3 style="margin-bottom:.5rem;">Issued Items Report</h3>
-<div class="table-card">
-  <div class="d-flex justify-content-between align-items-center no-print" 
-     style="gap:14px; margin-bottom:12px; flex-wrap:wrap;">
+<!-- Simple page content (no cards / no shadows) -->
+<div class="report-header" role="banner">
+  <h1 class="report-title">Inventory Stock Report</h1>
+  <div class="report-meta">Report generated: <strong><?php echo htmlspecialchars($reportDate, ENT_QUOTES, 'UTF-8') ?></strong>
+    <span class="muted"> — Stock In: <?php echo (int)$stock_in_total ?> | Stock Out: <?php echo (int)$stock_out_total ?></span>
+  </div>
 
-    <!-- FILTER FORM ROW -->
-    <form method="get" class="d-flex align-items-center" 
-          style="gap:10px; flex-wrap:nowrap;">
-
-        <!-- Category -->
-        <div>
-            <label style="font-size:.85rem; margin-bottom:2px;">Category</label>
-            <select name="category" class="form-control form-control-sm" 
-                    style="min-width:150px;">
-                <option value="">All categories</option>
-                <?php foreach ($categories as $c): ?>
-                    <option value="<?php echo htmlspecialchars($c) ?>" 
-                        <?php if($category_filter===$c) echo 'selected' ?>>
-                        <?php echo htmlspecialchars($c) ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-
-        <!-- Month -->
-        <div>
-            <label style="font-size:.85rem; margin-bottom:2px;">Month</label>
-            <select name="month" class="form-control form-control-sm" 
-                    style="min-width:150px;">
-                <option value="">All months</option>
-                <?php foreach ($month_options as $ym):
-                    $label = DateTime::createFromFormat('!Y-m', $ym)
-                        ? DateTime::createFromFormat('!Y-m', $ym)->format('F Y')
-                        : $ym;
-                ?>
-                    <option value="<?php echo htmlspecialchars($ym) ?>" 
-                        <?php if($month_filter===$ym) echo 'selected' ?>>
-                        <?php echo htmlspecialchars($label) ?>
-                    </option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-
-        <!-- Buttons -->
-        <div class="d-flex align-items-end" style="gap:8px; margin-top:22px;">
-            <button class="btn btn-sm btn-primary" style="padding: .45rem .8rem;">Filter</button>
-            <a href="reports.php" class="btn btn-sm btn-outline-secondary" style="padding: .45rem .8rem;">Reset</a>
-        </div>
-    </form>
-
-    <!-- PRINT BUTTON -->
-    <button class="btn btn-sm btn-success no-print" onclick="window.print()">
-        Print / Save as PDF
-    </button>
-
+  <!-- Screen-only print action -->
+  <div class="screen-actions no-print">
+    <button class="btn btn-sm" onclick="window.print()" style="padding:.4rem .6rem;border:1px solid #ccc;border-radius:6px;background:#f6f6f6;cursor:pointer">Print / Save as PDF</button>
+    <span class="print-note">This view is optimized for printing — controls and site chrome will be hidden on print.</span>
+  </div>
 </div>
 
+<!-- STOCK IN TABLE -->
+<section aria-labelledby="stock-in-heading">
+  <div id="stock-in-heading" class="section-title">In Stock (<?php echo (int)$stock_in_total ?>)</div>
 
-  <div class="table-responsive" style="margin-top:.75rem;">
-    <table class="table-modern w-100">
-      <thead>
+  <table class="plain-table" role="table" aria-label="Stock In table">
+    <thead>
+      <tr>
+        <th style="width:18%;">Category</th>
+        <th style="width:44%;">Item</th>
+        <th style="width:18%;">Code</th>
+        <th style="width:10%; text-align:right;">Qty</th>
+        <th style="width:10%;">Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      <?php if (empty($stock_in)): ?>
+        <tr><td colspan="5">No items currently in stock.</td></tr>
+      <?php else: foreach ($stock_in as $it): ?>
         <tr>
-          <th style="width:110px;">Category</th>
-          <th>Item</th>
-          <th style="width:70px;">Qty</th>
-          <th style="width:160px;">To</th>
-          <th style="width:140px;">By</th>
-          <th style="width:160px;">Date</th>
+          <td><?php echo htmlspecialchars($it['category'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
+          <td style="font-weight:600;"><?php echo htmlspecialchars($it['item_name'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
+          <td class="col-code"><?php echo htmlspecialchars($it['item_code'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
+          <td style="text-align:right;"><?php echo (int)$it['quantity'] ?></td>
+          <td>In Stock</td>
         </tr>
-      </thead>
-      <tbody>
-        <?php if (empty($rows)): ?>
-          <tr><td colspan="6">No records found.</td></tr>
-        <?php else: foreach ($rows as $r): ?>
-          <tr>
-            <td>
-              <?php
-                $cat = $r['category'] ?? '';
-                if (strtolower($cat) === 'medicine') echo '<span class="badge-med">Medicine</span>';
-                else echo '<span class="badge-sup">Supply</span>';
-              ?>
-            </td>
-            <td>
-              <div style="font-weight:600;"><?php echo htmlspecialchars($r['item_name']) ?></div>
-              <div style="color:#6c757d;font-size:.85rem;"><?php echo htmlspecialchars($r['item_code'] ?? '') ?></div>
-            </td>
-            <td><?php echo (int)$r['quantity_issued'] ?></td>
-            <td><?php echo htmlspecialchars($r['issued_to']) ?></td>
-            <td><?php echo htmlspecialchars($r['issuer'] ?? '') ?></td>
-            <td><?php echo htmlspecialchars($r['date_issued']) ?></td>
-          </tr>
-        <?php endforeach; endif; ?>
-      </tbody>
-    </table>
-  </div>
-</div>
+      <?php endforeach; endif; ?>
+    </tbody>
+  </table>
+</section>
 
-<!-- Optional summary header for print view -->
-<?php if (!empty($displayMonthLabel)): ?>
-  <div style="margin-top:12px; font-size:.95rem; color:#555;">
-    Showing records for: <strong><?php echo htmlspecialchars($displayMonthLabel); ?></strong>
-    <?php if (!empty($category_filter)): ?> — Category: <strong><?php echo htmlspecialchars($category_filter); ?></strong><?php endif; ?>
-  </div>
-<?php endif; ?>
+<!-- STOCK OUT TABLE -->
+<section aria-labelledby="stock-out-heading">
+  <div id="stock-out-heading" class="section-title">Out of Stock (<?php echo (int)$stock_out_total ?>)</div>
+
+  <table class="plain-table" role="table" aria-label="Stock Out table">
+    <thead>
+      <tr>
+        <th style="width:18%;">Category</th>
+        <th style="width:44%;">Item</th>
+        <th style="width:18%;">Code</th>
+        <th style="width:10%; text-align:right;">Qty</th>
+        <th style="width:10%;">Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      <?php if (empty($stock_out)): ?>
+        <tr><td colspan="5">No stock-out items.</td></tr>
+      <?php else: foreach ($stock_out as $it): ?>
+        <tr>
+          <td><?php echo htmlspecialchars($it['category'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
+          <td style="font-weight:600;"><?php echo htmlspecialchars($it['item_name'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
+          <td class="col-code"><?php echo htmlspecialchars($it['item_code'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
+          <td style="text-align:right;"><?php echo (int)$it['quantity'] ?></td>
+          <td>Out of Stock</td>
+        </tr>
+      <?php endforeach; endif; ?>
+    </tbody>
+  </table>
+</section>
+
+<?php
+

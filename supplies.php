@@ -1,7 +1,7 @@
 <?php
 require_once 'header.php';
 require_once 'functions.php';
-$user_id = $_SESSION['user_id'];
+$user_id = $_SESSION['user_id'] ?? 0;
 $action = $_GET['action'] ?? 'list';
 
 // --- Server-side CRUD (unchanged logic, slightly hardened) ---
@@ -57,6 +57,7 @@ $sql = "SELECT * FROM supplies WHERE 1=1";
 $params = [];
 $types = '';
 if ($search !== '') { $sql .= " AND item_name LIKE ?"; $params[] = "%$search%"; $types .= 's'; }
+// Note: status_filter will filter against stored status column if specified
 if ($status_filter !== '') { $sql .= " AND status = ?"; $params[] = $status_filter; $types .= 's'; }
 $sql .= " ORDER BY date_received DESC, supply_id DESC";
 
@@ -66,22 +67,32 @@ if (!empty($params)) { $stmt->bind_param($types, ...$params); }
 $stmt->execute();
 $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
+
+// Derive status for display (Out of Stock / Low Stock / Available)
+$derived = [];
+foreach ($rows as $r) {
+    $row = $r;
+    $row['quantity'] = (int)$r['quantity'];
+    // precedence: Out of Stock (<=0) > Low Stock (<50) > Available
+    if ($row['quantity'] <= 0) $row['derived_status'] = 'Out of Stock';
+    elseif ($row['quantity'] < 50) $row['derived_status'] = 'Low Stock';
+    else $row['derived_status'] = 'Available';
+    $derived[] = $row;
+}
 ?>
 
 <!-- Page-specific styles (leave table-modern in style.css) -->
 <style>
-  /* card container */
-  .table-card {
-    background: #fff;
-    border-radius: 10px;
-    padding: 1rem;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.06);
-  }
+  /* container card */
+  .table-card { background:#fff; border-radius:10px; padding:1rem; box-shadow:0 8px 24px rgba(0,0,0,0.06); }
 
+  /* simple utility classes (kept small) */
   .d-flex { display:flex; }
   .justify-content-between { justify-content: space-between; }
   .align-items-center { align-items:center; }
   .mb-2 { margin-bottom:.5rem; }
+
+  /* buttons */
   .btn { display:inline-flex; align-items:center; gap:.5rem; padding:.375rem .6rem; border-radius:6px; border:1px solid transparent; text-decoration:none; cursor:pointer; }
   .btn-sm { font-size:.85rem; padding:.275rem .5rem; border-radius:6px; }
   .btn-primary { background:#0d6efd; color:#fff; border-color:#0d6efd; }
@@ -96,29 +107,9 @@ $stmt->close();
   .badge-out { display:inline-block; padding:.25rem .5rem; border-radius:999px; background:#ffecec; color:#c21c1c; font-weight:600; font-size:.82rem; }
 
   /* modal backdrop & panel (no blur) */
-  .modal-backdrops {
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.45);
-    display: none;
-    z-index: 1050;
-    align-items: center;
-    justify-content: center;
-    padding: 1rem;
-  }
+  .modal-backdrops { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: none; z-index: 1050; align-items: center; justify-content: center; padding: 1rem; }
   .modal-backdrops.show { display: flex; }
-
-  .modal-panel {
-    background: #fff;
-    border-radius: 10px;
-    width: 100%;
-    max-width: 720px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.25);
-    z-index: 1060;
-    padding: 1.25rem;
-    max-height: 90vh;
-    overflow: auto;
-  }
+  .modal-panel { background: #fff; border-radius: 10px; width: 100%; max-width: 720px; box-shadow: 0 10px 30px rgba(0,0,0,0.25); z-index: 1060; padding: 1.25rem; max-height: 90vh; overflow: auto; }
 
   .modal-header { display:flex; justify-content:space-between; align-items:center; margin-bottom: .75rem; }
   .modal-title { font-weight:600; font-size:1.1rem; }
@@ -127,33 +118,69 @@ $stmt->close();
   .form-row { display:flex; gap:12px; flex-wrap:wrap; }
   .form-row .form-group { flex:1; min-width:180px; }
   .btn-modal { margin-right:8px; }
-
   body.modal-open { overflow: hidden; } /* prevent background scroll */
 
   input.form-control, select.form-control { width:100%; padding:.45rem .5rem; border:1px solid #dfe3e6; border-radius:6px; }
   label { display:block; font-size:.9rem; margin-bottom:.25rem; color:#333; }
-  @media (max-width:600px) { .modal-panel { padding: .75rem; border-radius:8px; } }
+
+  /* Filters + Add aligned on one row (no horizontal scroll) */
+  .filters-wrap {
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    flex-wrap:wrap; /* allow wrapping on very small screens */
+    margin-bottom:8px;
+  }
+  .filters-left {
+    display:flex;
+    align-items:center;
+    gap:10px;
+    flex:1 1 auto;
+    min-width:0;
+    flex-wrap:wrap;
+  }
+  .filters-left .form-control { height:36px; padding:6px 10px; font-size:0.95rem; }
+  .input-search { flex: 1 1 220px; min-width:140px; max-width:420px; }
+  .input-status { flex: 0 1 160px; min-width:120px; max-width:240px; }
+  .filters-right { flex:0 0 auto; display:flex; align-items:center; gap:8px; }
+
+  /* compact table cells */
+  .table-modern th, .table-modern td { padding:12px 10px; vertical-align:middle; }
+
+  @media (max-width:560px) {
+    .input-search { flex-basis:100%; max-width:100%; }
+    .input-status { flex-basis:48%; max-width:48%; }
+    .filters-right { width:100%; justify-content:flex-end; margin-top:6px; }
+  }
 </style>
 
 <h3>Health Supplies</h3>
 
 <div class="table-card">
-  <div class="d-flex justify-content-between align-items-center">
-    <div class="table-actions">
-      <form class="d-flex" method="get" style="gap:8px; align-items:center;">
-        <input name="search" value="<?php echo htmlspecialchars($search) ?>" placeholder="Search supplies..." class="form-control form-control-sm" style="padding:.35rem .5rem;">
-        <select name="status" class="form-control form-control-sm" style="padding:.35rem .5rem;">
+  <div class="d-flex justify-content-between align-items-center mb-2" style="gap:10px;">
+    <div style="font-weight:600">Supplies</div>
+    <div style="font-size:.95rem;color:#666;">(Statuses auto-derived: Out of Stock / Low Stock / Available)</div>
+  </div>
+
+  <div class="filters-wrap">
+    <div class="filters-left">
+      <form id="filterForm" method="get" class="d-flex align-items-center" style="gap:10px;flex-wrap:wrap;">
+        <input name="search" value="<?php echo htmlspecialchars($search) ?>" placeholder="Search supplies..." class="form-control input-search" />
+        <select name="status" class="form-control input-status">
           <option value="">All status</option>
           <option value="Available" <?php if($status_filter==='Available') echo 'selected' ?>>Available</option>
           <option value="Low Stock" <?php if($status_filter==='Low Stock') echo 'selected' ?>>Low Stock</option>
           <option value="Out of Stock" <?php if($status_filter==='Out of Stock') echo 'selected' ?>>Out of Stock</option>
         </select>
-        <button class="btn btn-sm btn-primary">Filter</button>
-        <a href="supplies.php" class="btn btn-sm btn-outline-secondary">Reset</a>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-sm btn-primary" type="submit">Filter</button>
+          <a href="supplies.php" class="btn btn-sm btn-outline-secondary">Reset</a>
+        </div>
       </form>
     </div>
 
-    <div>
+    <div class="filters-right">
       <!-- JS intercepts this to open modal; fallback link kept for no-JS -->
       <a id="openUnifiedBtn" href="supplies.php?action=add" class="btn btn-sm btn-success"><span style="font-weight:700;">＋</span> Add Supply</a>
     </div>
@@ -174,9 +201,9 @@ $stmt->close();
         </tr>
       </thead>
       <tbody>
-        <?php if (empty($rows)): ?>
+        <?php if (empty($derived)): ?>
           <tr><td colspan="7">No records found.</td></tr>
-        <?php else: foreach ($rows as $r): ?>
+        <?php else: foreach ($derived as $r): ?>
           <tr>
             <td><?php echo htmlspecialchars($r['item_code']) ?></td>
             <td><?php echo htmlspecialchars($r['item_name']) ?></td>
@@ -184,10 +211,10 @@ $stmt->close();
             <td><?php echo htmlspecialchars($r['supplier']) ?></td>
             <td>
               <?php
-                $st = $r['status'] ?? '';
-                if ($st === 'Available') echo '<span class="badge-available">Available</span>';
-                elseif ($st === 'Low Stock') echo '<span class="badge-low">Low Stock</span>';
-                else echo '<span class="badge-out">'.htmlspecialchars($st).'</span>';
+                $ds = $r['derived_status'];
+                if ($ds === 'Available') echo '<span class="badge-available">Available</span>';
+                elseif ($ds === 'Low Stock') echo '<span class="badge-low">Low Stock</span>';
+                else echo '<span class="badge-out">Out of Stock</span>';
               ?>
             </td>
             <td><?php echo htmlspecialchars($r['date_received']) ?></td>
