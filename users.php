@@ -71,7 +71,7 @@ $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
 ?>
 
-<!-- Styles: consistent table-card + modal system -->
+<!-- Styles: adapted from issuance -> consistent card/table/modal system -->
 <style>
   .table-card { background:#fff; border-radius:10px; padding:1rem; box-shadow:0 8px 24px rgba(0,0,0,0.06); }
   .d-flex{display:flex}.justify-content-between{justify-content:space-between}.align-items-center{align-items:center}
@@ -82,11 +82,6 @@ $stmt->close();
   .btn-secondary{background:#6c757d;color:#fff;border-color:#6c757d}
   .btn-danger{background:#dc3545;color:#fff;border-color:#dc3545}
   .btn-outline-secondary{background:transparent;color:#495057;border-color:#ced4da}
-
-  .table{width:100%;border-collapse:collapse;font-size:.95rem}
-  .table thead th{padding:.6rem .75rem;border-bottom:1px solid #e9ecef;color:#495057;font-weight:600;text-align:left}
-  .table tbody td{padding:.6rem .75rem;border-bottom:1px solid #f1f3f5;vertical-align:middle}
-  .table tr:hover td{background:#fbfdff}
 
   .badge-active{display:inline-block;padding:.25rem .5rem;border-radius:999px;background:#e6f4ea;color:#0b7a3a;font-weight:600;font-size:.82rem}
   .badge-inactive{display:inline-block;padding:.25rem .5rem;border-radius:999px;background:#ffecec;color:#c21c1c;font-weight:600;font-size:.82rem}
@@ -104,6 +99,17 @@ $stmt->close();
   @media (max-width:600px){.modal-panel{padding:.75rem;border-radius:8px}}
   label{display:block;font-size:.9rem;margin-bottom:.25rem;color:#333}
   input.form-control,select.form-control{width:100%;padding:.45rem .5rem;border:1px solid #dfe3e6;border-radius:6px}
+
+  /* Issuance-style table specifics (applied to users list) */
+  .table-responsive{overflow:auto}
+  .table-modern{width:100%;border-collapse:collapse;font-size:.95rem}
+  .table-modern th{padding:.6rem .5rem;border-bottom:1px solid #f1f3f5;color:#495057;font-weight:600;text-align:left}
+  .table-modern td{padding:.6rem .5rem;border-bottom:1px solid #f1f3f5;vertical-align:middle}
+  .table-modern tr:hover td{background:#fbfdff}
+  .actions-cell{display:flex;gap:8px;justify-content:flex-end;align-items:center}
+  @media (max-width:720px){
+    .table-modern th, .table-modern td {font-size:.9rem}
+  }
 </style>
 
 <h3 style="margin-bottom:.5rem;">Users Management</h3>
@@ -120,15 +126,15 @@ $stmt->close();
   </div>
 
   <div class="table-responsive">
-    <table class="table table-sm">
+    <table class="table-modern w-100">
       <thead>
         <tr>
-          <th>Name</th>
-          <th>Username</th>
-          <th>Role</th>
-          <th>Status</th>
-          <th>Created</th>
-          <th>Actions</th>
+          <th style="width:260px;">Name</th>
+          <th style="width:160px;">Username</th>
+          <th style="width:140px;">Role</th>
+          <th style="width:110px;">Status</th>
+          <th style="width:160px;">Created</th>
+          <th style="width:120px;text-align:right;">Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -136,14 +142,17 @@ $stmt->close();
           <tr><td colspan="6">No users found.</td></tr>
         <?php else: foreach ($rows as $r): ?>
           <tr>
-            <td><?php echo htmlspecialchars($r['name']) ?></td>
-            <td><?php echo htmlspecialchars($r['username']) ?></td>
+            <td>
+              <div style="font-weight:600;"><?php echo htmlspecialchars($r['name']) ?></div>
+            </td>
+            <td style="color:#6c757d;"><?php echo htmlspecialchars($r['username']) ?></td>
             <td><?php echo htmlspecialchars($r['role']) ?></td>
             <td>
               <?php if (($r['status'] ?? '') === 'Active') echo '<span class="badge-active">Active</span>'; else echo '<span class="badge-inactive">Inactive</span>'; ?>
             </td>
-            <td><?php echo htmlspecialchars($r['date_created']) ?></td>
+            <td style="color:#6c757d;"><?php echo htmlspecialchars($r['date_created']) ?></td>
             <td>
+              <div class="actions-cell">
               <?php
                 $data_attrs = [
                   'id' => $r['user_id'],
@@ -157,10 +166,11 @@ $stmt->close();
                     $data_str .= ' data-'.$k.'="'.htmlspecialchars($v, ENT_QUOTES).'"';
                 }
               ?>
-              <a class="btn btn-sm btn-outline-secondary openUnifiedEdit" href="users.php?action=edit&id=<?php echo $r['user_id'] ?>" <?php echo $data_str; ?> title="Edit">Edit</a>
-              <?php if (($r['status'] ?? '') === 'Active'): ?>
-                <a class="btn btn-sm btn-danger" href="users.php?action=deactivate&id=<?php echo $r['user_id'] ?>" onclick="return confirm('Deactivate?')">Deactivate</a>
-              <?php endif; ?>
+                <a class="btn btn-sm btn-outline-secondary openUnifiedEdit" href="users.php?action=edit&id=<?php echo $r['user_id'] ?>" <?php echo $data_str; ?> title="Edit">Edit</a>
+                <?php if (($r['status'] ?? '') === 'Active'): ?>
+                  <a class="btn btn-sm btn-danger" href="users.php?action=deactivate&id=<?php echo $r['user_id'] ?>" onclick="return confirm('Deactivate?')">Deactivate</a>
+                <?php endif; ?>
+              </div>
             </td>
           </tr>
         <?php endforeach; endif; ?>
@@ -383,3 +393,4 @@ endif;
 
 })();
 </script>
+ 

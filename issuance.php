@@ -1,7 +1,13 @@
 <?php
+
+require_once 'config.php';
 require_once 'header.php';
 require_once 'functions.php';
-$user_id = $_SESSION['user_id'];
+
+$user_id = $_SESSION['user_id'] ?? null;
+if (!$user_id) {
+    header('Location: login.php'); exit;
+}
 
 $action = $_GET['action'] ?? 'list';
 
@@ -23,38 +29,62 @@ if ($mstmt !== false) {
 // --- Server-side CRUD / Issue logic ---
 if ($action === 'add' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $category = $_POST['category'] ?? '';
-    $item_code = $_POST['item_code'] ?? '';
+    $item_code = trim($_POST['item_code'] ?? '');
     $item_name = $_POST['item_name'] ?? '';
     $quantity_issued = intval($_POST['quantity_issued'] ?? 0);
     $issued_to = $_POST['issued_to'] ?? '';
     $purpose = $_POST['purpose'] ?? '';
 
-    // Insert issuance with date_issued = NOW()
+    // normalize category
+    $is_medicine = (strtolower(trim($category)) === 'medicine');
+    $table = $is_medicine ? 'medicine' : 'supplies';
+
+    // server-side: fetch current stock (authoritative)
+    $stock_stmt = $mysqli->prepare("SELECT quantity FROM `$table` WHERE item_code = ? LIMIT 1");
+    if ($stock_stmt === false) { die('Prepare failed: ' . $mysqli->error); }
+    $stock_stmt->bind_param('s', $item_code);
+    $stock_stmt->execute();
+    $stock_res = $stock_stmt->get_result();
+    $current_stock = null;
+    if ($row = $stock_res->fetch_assoc()) {
+        $current_stock = (int)$row['quantity'];
+    }
+    $stock_stmt->close();
+
+    if ($current_stock === null) {
+        // item not found
+        $_SESSION['flash_error'] = 'Item code not found for selected category.';
+        header('Location: issuance.php?action=add'); exit;
+    }
+
+    if ($quantity_issued <= 0) {
+        $_SESSION['flash_error'] = 'Invalid quantity.';
+        header('Location: issuance.php?action=add'); exit;
+    }
+
+    if ($quantity_issued > $current_stock) {
+        $_SESSION['flash_error'] = 'Requested quantity (' . $quantity_issued . ') exceeds current stock (' . $current_stock . ').';
+        header('Location: issuance.php?action=add'); exit;
+    }
+
+    // proceed with insertion
     $stmt = $mysqli->prepare('INSERT INTO issuance (category,item_code,item_name,quantity_issued,issued_to,purpose,issued_by,date_issued) VALUES (?,?,?,?,?,?,?,NOW())');
     if ($stmt === false) { die('Prepare failed: ' . $mysqli->error); }
     $stmt->bind_param('sssissi', $category, $item_code, $item_name, $quantity_issued, $issued_to, $purpose, $user_id);
     $stmt->execute();
     $stmt->close();
 
-    // Deduct from stock depending on category
-    if (strtolower($category) === 'medicine') {
-        $stmt = $mysqli->prepare('UPDATE medicine SET quantity = quantity - ? WHERE item_code = ? LIMIT 1');
-        if ($stmt !== false) {
-            $stmt->bind_param('is', $quantity_issued, $item_code);
-            $stmt->execute();
-            $stmt->close();
-        }
+    // Deduct from stock (server-side)
+    if ($is_medicine) {
+        $ust = $mysqli->prepare('UPDATE medicine SET quantity = quantity - ? WHERE item_code = ? LIMIT 1');
+        if ($ust !== false) { $ust->bind_param('is', $quantity_issued, $item_code); $ust->execute(); $ust->close(); }
     } else {
-        // assume supplies for anything else
-        $stmt = $mysqli->prepare('UPDATE supplies SET quantity = quantity - ? WHERE item_code = ? LIMIT 1');
-        if ($stmt !== false) {
-            $stmt->bind_param('is', $quantity_issued, $item_code);
-            $stmt->execute();
-            $stmt->close();
-        }
+        $ust = $mysqli->prepare('UPDATE supplies SET quantity = quantity - ? WHERE item_code = ? LIMIT 1');
+        if ($ust !== false) { $ust->bind_param('is', $quantity_issued, $item_code); $ust->execute(); $ust->close(); }
     }
 
     log_activity($user_id, 'Issued ' . $quantity_issued . ' x ' . $item_name . ' to ' . $issued_to);
+    $_SESSION['flash_success'] = 'Issued successfully.';
     header('Location: issuance.php'); exit;
 }
 
@@ -66,6 +96,7 @@ if ($action === 'delete') {
     $stmt->execute();
     $stmt->close();
     log_activity($user_id, 'Deleted issuance ID ' . $id);
+    $_SESSION['flash_success'] = 'Issuance record deleted.';
     header('Location: issuance.php'); exit;
 }
 
@@ -83,7 +114,6 @@ if ($category_filter !== '') {
     $types .= 's';
 }
 if ($month_filter !== '') {
-    // use DATE_FORMAT on date_issued to match YYYY-MM
     $sql .= " AND DATE_FORMAT(i.date_issued, '%Y-%m') = ?";
     $params[] = $month_filter;
     $types .= 's';
@@ -130,12 +160,21 @@ $stmt->close();
   label{display:block;font-size:.9rem;margin-bottom:.25rem;color:#333}
   input.form-control,select.form-control,textarea.form-control{width:100%;padding:.45rem .5rem;border:1px solid #dfe3e6;border-radius:6px}
   textarea.form-control{min-height:84px;resize:vertical}
+  .table-modern{width:100%;border-collapse:collapse}
+  .table-modern th, .table-modern td {padding:.6rem .5rem;border-bottom:1px solid #f1f3f5;text-align:left;vertical-align:middle}
 </style>
 
 <h3 style="margin-bottom:.5rem;">Medicine and Supply Issuance</h3>
 
+<?php if (!empty($_SESSION['flash_success'])): ?>
+  <div style="padding:.6rem;border-radius:6px;background:#e6ffed;color:#065f2d;margin-bottom:.75rem;"><?php echo htmlspecialchars($_SESSION['flash_success']); unset($_SESSION['flash_success']); ?></div>
+<?php endif; ?>
+<?php if (!empty($_SESSION['flash_error'])): ?>
+  <div style="padding:.6rem;border-radius:6px;background:#ffecec;color:#811b1b;margin-bottom:.75rem;"><?php echo htmlspecialchars($_SESSION['flash_error']); unset($_SESSION['flash_error']); ?></div>
+<?php endif; ?>
+
 <div class="table-card">
-  <div class="d-flex justify-content-between align-items-center mb-2">
+  <div class="d-flex justify-content-between align-items-center">
     <div class="table-actions">
       <form method="get" class="d-flex" style="gap:8px; align-items:center;">
         <!-- Category filter -->
@@ -149,8 +188,7 @@ $stmt->close();
         <!-- Month filter (YYYY-MM) -->
         <select name="month" class="form-control form-control-sm">
           <option value="">All months</option>
-          <?php foreach ($month_options as $ym): 
-              // pretty label: convert YYYY-MM to "Month YYYY"
+          <?php foreach ($month_options as $ym):
               $label = DateTime::createFromFormat('!Y-m', $ym) ? DateTime::createFromFormat('!Y-m', $ym)->format('F Y') : $ym;
           ?>
             <option value="<?php echo htmlspecialchars($ym) ?>" <?php if($month_filter===$ym) echo 'selected' ?>><?php echo htmlspecialchars($label) ?></option>
@@ -167,7 +205,7 @@ $stmt->close();
     </div>
   </div>
 
-   <div class="table-responsive">
+   <div class="table-responsive" style="margin-top:.75rem;">
     <table class="table table-modern w-100">
       <thead>
         <tr>
@@ -234,14 +272,18 @@ $stmt->close();
         </div>
         <div class="form-group mb-2">
           <label for="u_item_code">Item Code</label>
-          <input id="u_item_code" name="item_code" class="form-control" />
+          <input id="u_item_code" name="item_code" class="form-control" autocomplete="off" />
         </div>
       </div>
 
       <div class="form-row">
-        <div class="form-group mb-2">
+        <div class="form-group mb-2" style="position:relative;">
           <label for="u_item_name">Item Name</label>
           <input id="u_item_name" name="item_name" class="form-control" required />
+          <div id="u_stock_row" style="margin-top:.35rem; font-size:.9rem; color:#495057; display:none;">
+            Current stock: <strong id="u_stock_display">0</strong>
+          </div>
+          <input type="hidden" id="u_current_stock" name="current_stock" value="0" />
         </div>
         <div class="form-group mb-2">
           <label for="u_quantity_issued">Quantity</label>
@@ -288,7 +330,7 @@ $stmt->close();
   </form>
 <?php endif; ?>
 
-<!-- Modal JS (open/close, set action & title) -->
+<!-- Modal JS (open/close, set action & title, and lookup logic) -->
 <script>
 (function(){
   const body = document.body;
@@ -314,6 +356,12 @@ $stmt->close();
     title.textContent = 'Issue Item';
     submitBtn && (submitBtn.textContent = 'Issue');
     form.reset();
+    // hide stock row
+    const stockRow = document.getElementById('u_stock_row');
+    if (stockRow) stockRow.style.display = 'none';
+    const existingWarn = document.getElementById('u_qty_warn');
+    if (existingWarn) existingWarn.remove();
+    submitBtn.disabled = false;
   }
 
   // wire close buttons
@@ -349,7 +397,128 @@ $stmt->close();
   document.addEventListener('keydown', function(e){
     if(e.key === 'Escape' && modal.classList.contains('show')) closeModal();
   });
+
+  // --- Lookup and validation logic ---
+
+  // Helper - query DOM elements
+  const itemCodeEl = document.getElementById('u_item_code');
+  const categoryEl = document.getElementById('u_category');
+  const itemNameEl = document.getElementById('u_item_name');
+  const stockDisplayEl = document.getElementById('u_stock_display');
+  const stockRowEl = document.getElementById('u_stock_row');
+  const currentStockInput = document.getElementById('u_current_stock');
+  const qtyEl = document.getElementById('u_quantity_issued');
+
+  // debounce helper
+  function debounce(fn, delay) {
+    let t;
+    return (...args) => {
+      clearTimeout(t);
+      t = setTimeout(()=> fn(...args), delay);
+    };
+  }
+
+  async function fetchItemInfo(category, itemCode) {
+    if (!itemCode) {
+      return { success: false, error: 'empty' };
+    }
+
+    try {
+      const params = new URLSearchParams({ category: category || '', item_code: itemCode });
+      const resp = await fetch('ajax_get_item.php?' + params.toString(), { credentials: 'same-origin' });
+      if (!resp.ok) {
+        return { success: false, error: 'http' };
+      }
+      const data = await resp.json();
+      return data;
+    } catch (err) {
+      return { success: false, error: 'network', detail: err.toString() };
+    }
+  }
+
+  function showStock(quantity) {
+    stockRowEl.style.display = 'block';
+    stockDisplayEl.textContent = String(quantity);
+    currentStockInput.value = String(quantity);
+  }
+  function hideStock() {
+    stockRowEl.style.display = 'none';
+    stockDisplayEl.textContent = '0';
+    currentStockInput.value = '0';
+  }
+
+  const populateFromCode = debounce(async function() {
+    const code = (itemCodeEl && itemCodeEl.value || '').trim();
+    const category = (categoryEl && categoryEl.value || '').trim();
+
+    if (!code) { itemNameEl.value = ''; hideStock(); validateQuantity(); return; }
+
+    itemNameEl.value = 'Searching...';
+    const result = await fetchItemInfo(category, code);
+
+    if (result && result.success) {
+      itemNameEl.value = result.item_name || '';
+      showStock(result.quantity ?? 0);
+    } else {
+      itemNameEl.value = '';
+      hideStock();
+      if (result && result.error === 'not_found') {
+        itemNameEl.placeholder = 'Item code not found';
+      }
+    }
+    validateQuantity();
+  }, 250);
+
+  function validateQuantity() {
+    const q = parseInt(qtyEl.value || '0', 10);
+    const stock = parseInt(currentStockInput.value || '0', 10);
+
+    const existingWarn = document.getElementById('u_qty_warn');
+    if (existingWarn) existingWarn.remove();
+
+    if (!isFinite(q) || q <= 0) {
+      submitBtn.disabled = false;
+      return;
+    }
+
+    if (stock === 0) {
+      const warn = document.createElement('div');
+      warn.id = 'u_qty_warn';
+      warn.style.color = '#a94442';
+      warn.style.marginTop = '.35rem';
+      warn.style.fontSize = '.9rem';
+      warn.textContent = 'Cannot issue: no stock available.';
+      qtyEl.parentNode.appendChild(warn);
+      submitBtn.disabled = true;
+      return;
+    }
+
+    if (q > stock) {
+      const warn = document.createElement('div');
+      warn.id = 'u_qty_warn';
+      warn.style.color = '#a94442';
+      warn.style.marginTop = '.35rem';
+      warn.style.fontSize = '.9rem';
+      warn.textContent = 'Quantity exceeds current stock (' + stock + ').';
+      qtyEl.parentNode.appendChild(warn);
+      submitBtn.disabled = true;
+      return;
+    }
+
+    submitBtn.disabled = false;
+  }
+
+  if (itemCodeEl) {
+    itemCodeEl.addEventListener('input', populateFromCode);
+    itemCodeEl.addEventListener('blur', populateFromCode);
+  }
+  if (categoryEl) {
+    categoryEl.addEventListener('change', function(){ populateFromCode(); });
+  }
+  if (qtyEl) {
+    qtyEl.addEventListener('input', validateQuantity);
+    qtyEl.addEventListener('change', validateQuantity);
+  }
+
 })();
 </script>
-
-<?php require 'footer.php'; ?>

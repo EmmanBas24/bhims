@@ -142,7 +142,7 @@ $stmt->close();
 <h3>Medicine Management</h3>
 
 <div class="table-card">
-  <div class="d-flex justify-content-between align-items-center mb-2">
+  <div class="d-flex justify-content-between align-items-center">
     <div class="table-actions">
       <form class="d-flex" method="get" style="gap:8px;align-items:center;">
         <input name="search" value="<?php echo htmlspecialchars($search) ?>" placeholder="Search medicine..." class="form-control form-control-sm">
@@ -420,6 +420,3 @@ $stmt->close();
 
 })();
 </script>
-<style>
-/* add any additional page-specific styles below if needed */
-</style>

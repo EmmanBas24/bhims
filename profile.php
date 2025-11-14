@@ -34,8 +34,17 @@ if (!$user) {
 */
 
 // HEAD updates profile fields (name, username, role, status)
+// Support first_name + last_name incoming from form by concatenating into name
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile']) && $current_role === 'Head BHW') {
-    $new_name = trim($_POST['name'] ?? '');
+    // if form sent first_name + last_name, combine
+    if (isset($_POST['first_name']) || isset($_POST['last_name'])) {
+        $first = trim($_POST['first_name'] ?? '');
+        $last  = trim($_POST['last_name'] ?? '');
+        $new_name = trim($first . ' ' . $last);
+    } else {
+        $new_name = trim($_POST['name'] ?? '');
+    }
+
     $new_username = trim($_POST['username'] ?? '');
     $new_role = $_POST['role'] ?? 'BHW';
     $new_status = $_POST['status'] ?? 'Active';
@@ -117,221 +126,224 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_pass'])) {
         }
     }
 }
+
+/* Helper: split name for display into first / last */
+$first_name = '';
+$last_name = '';
+if (!empty($user['name'])) {
+    $parts = preg_split('/\s+/', trim($user['name']));
+    if (count($parts) === 1) {
+        $first_name = $parts[0];
+    } else {
+        $last_name = array_pop($parts);
+        $first_name = implode(' ', $parts);
+    }
+}
 ?>
 
-<!-- Styles: reuse the card/modal style used across the system -->
+<!-- load your site CSS (assumes header.php doesn't already include it) -->
+<link rel="stylesheet" href="/assets/css/style.css">
+
+<!-- small extra CSS to mimic screenshot layout -->
 <style>
-  .table-card {
-    background: #fff;
-    border-radius: 10px;
-    padding: 1rem;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+  .profile-wrap { max-width:1100px; margin:18px auto; padding:0 12px; }
+  .card { background:#fff; border-radius:10px; padding:18px; border:1px solid #eef3f6; box-shadow:0 6px 18px rgba(12,17,25,0.03); }
+  .card + .card { margin-top:16px; }
+  .card-title { font-weight:600; font-size:15px; color:#0b4f6c; margin-bottom:12px; }
+  .form-row { display:flex; gap:12px; align-items:stretch; }
+  .label-col { width:180px; padding-top:6px; color:#374151; font-size:14px; }
+  .input-col { flex:1; }
+  .form-control { width:100%; padding:10px 12px; border:1px solid #e6eef3; border-radius:8px; background:#fff; box-sizing:border-box; }
+  .note { color:#6b7280; font-size:13px; margin-top:6px; }
+  .pw-req { list-style: disc; padding-left:18px; margin:8px 0 0 0; color:#475569; font-size:13px; }
+  .pw-panel { background:#fbfdff; border:1px solid #eef6f8; padding:12px; border-radius:8px; }
+  .btn-primary { background:#2b9adf; color:#fff; border:0; padding:10px 16px; border-radius:8px; cursor:pointer; }
+  .btn-ghost { background:transparent; border:1px solid #dbe7eb; padding:10px 14px; border-radius:8px; cursor:pointer; color:#374151; }
+  .two-cols { display:grid; grid-template-columns: 1fr 360px; gap:18px; align-items:start; }
+  @media (max-width: 980px) {
+    .two-cols { grid-template-columns: 1fr; }
+    .label-col { width:120px; }
   }
-  .mb-2 { margin-bottom:.5rem; }
-  .btn { display:inline-flex; align-items:center; gap:.5rem; padding:.375rem .6rem; border-radius:6px; border:1px solid transparent; text-decoration:none; cursor:pointer; }
-  .btn-primary { background:#0d6efd; color:#fff; border-color:#0d6efd; }
-  .btn-outline-secondary { background:transparent; color:#495057; border-color:#ced4da; }
-  label { display:block; font-size:.9rem; margin-bottom:.25rem; color:#333; }
-  input.form-control, select.form-control, textarea.form-control { width:100%; padding:.45rem .5rem; border:1px solid #dfe3e6; border-radius:6px; }
-  textarea.form-control { min-height:100px; resize:vertical; }
-
-  /* modal backdrop & panel (no blur) */
-  .modal-backdrops {
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.45);
-    display: none;
-    z-index: 1050;
-    align-items: center;
-    justify-content: center;
-    padding: 1rem;
-  }
-  .modal-backdrops.show { display: flex; }
-  .modal-panel {
-    background: #fff;
-    border-radius: 10px;
-    width: 100%;
-    max-width: 720px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.25);
-    z-index: 1060;
-    padding: 1.25rem;
-    max-height: 90vh;
-    overflow: auto;
-  }
-  .modal-header{ display:flex; justify-content:space-between; align-items:center; margin-bottom:.75rem; }
-  .modal-title{ font-weight:600; font-size:1.1rem; }
-  .modal-close{ background:none; border:0; font-size:1.4rem; cursor:pointer; }
-  .form-row{ display:flex; gap:12px; flex-wrap:wrap; }
-  .form-row .form-group{ flex:1; min-width:180px; }
-  body.modal-open { overflow: hidden; }
-
-  /* small device tweaks */
-  @media (max-width:600px) { .modal-panel { padding:.75rem; border-radius:8px; } }
+  .split-name { display:flex; gap:12px; }
+  .small-muted { color:#94a3b8; font-size:13px; }
 </style>
 
-<div class="container-fluid">
-  <h3>Profile</h3>
-
+<div class="profile-wrap">
   <?php if ($success): ?>
-    <div class="alert alert-success"><?php echo htmlspecialchars($success) ?></div>
+    <div style="margin-bottom:12px;" class="card"><div style="color: #0f5132; font-weight:600;"><?php echo htmlspecialchars($success) ?></div></div>
   <?php endif; ?>
   <?php if ($error): ?>
-    <div class="alert alert-danger"><?php echo htmlspecialchars($error) ?></div>
+    <div style="margin-bottom:12px;" class="card"><div style="color:#842029; font-weight:600;"><?php echo htmlspecialchars($error) ?></div></div>
   <?php endif; ?>
 
-  <div class="row" style="display:flex; gap:16px; flex-wrap:wrap;">
-    <!-- Left: Profile details -->
-    <div style="flex:1 1 420px; min-width:280px;">
-      <div class="table-card">
-        <h5 class="mb-3">Your Details</h5>
-        <table class="table table-borderless" style="width:100%; border-collapse:collapse; font-size:.95rem;">
-          <tr><th style="width:160px; text-align:left; padding:.35rem 0;">User ID</th><td style="padding:.35rem 0;"><?php echo (int)$user['user_id'] ?></td></tr>
-          <tr><th style="text-align:left; padding:.35rem 0;">Name</th><td style="padding:.35rem 0;"><?php echo htmlspecialchars($user['name']) ?></td></tr>
-          <tr><th style="text-align:left; padding:.35rem 0;">Username</th><td style="padding:.35rem 0;"><?php echo htmlspecialchars($user['username']) ?></td></tr>
-          <tr><th style="text-align:left; padding:.35rem 0;">Role</th><td style="padding:.35rem 0;"><?php echo htmlspecialchars($user['role']) ?></td></tr>
-          <tr><th style="text-align:left; padding:.35rem 0;">Status</th><td style="padding:.35rem 0;"><?php echo htmlspecialchars($user['status']) ?></td></tr>
-          <tr><th style="text-align:left; padding:.35rem 0;">Date Created</th><td style="padding:.35rem 0;"><?php echo htmlspecialchars($user['date_created']) ?></td></tr>
-        </table>
+  
+  <!-- Basic information card (matches screenshot layout) -->
+  <div class="card" style="margin-top:16px;">
+    <div class="card-title">Basic information</div>
 
-        <?php if ($current_role === 'Head BHW'): ?>
-          <div class="mt-3">
-            <!-- JS will intercept and open modal. fallback link for no-JS -->
-            <a id="openEditBtn" href="?action=edit" class="btn btn-primary">Edit Details</a>
-          </div>
-        <?php else: ?>
-          <div class="mt-3">
-            <small class="text-muted">To update your name or username, contact the Head BHW.</small>
-          </div>
-        <?php endif; ?>
-      </div>
-    </div>
-
-    <!-- Right: Password change (available to all) -->
-    <div style="flex:1 1 360px; min-width:280px;">
-      <div class="table-card">
-        <h5 class="mb-3">Change Password</h5>
-        <form method="post">
-          <div class="mb-2">
-            <label>Current Password</label>
-            <input type="password" name="current_password" class="form-control" required>
-          </div>
-          <div class="mb-2">
-            <label>New Password</label>
-            <input type="password" name="new_password" class="form-control" required>
-          </div>
-          <div class="mb-2">
-            <label>Confirm New Password</label>
-            <input type="password" name="confirm_password" class="form-control" required>
-          </div>
-          <button name="change_pass" class="btn" style="background:#ffc107;color:#000;border-color:#ffc107;padding:.4rem .7rem;">Change Password</button>
-        </form>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- Unified Edit Modal (Head BHW only) -->
-<?php if ($current_role === 'Head BHW'): ?>
-<div id="editProfileModal" class="modal-backdrops" aria-hidden="true" role="dialog" aria-modal="true">
-  <div class="modal-panel" role="document">
-    <div class="modal-header">
-      <div class="modal-title">Edit Profile Details</div>
-      <button class="modal-close" data-close aria-label="Close">&times;</button>
-    </div>
-
-    <form id="editProfileForm" method="post" action="">
+    <form method="post" style="margin-top:6px;">
       <input type="hidden" name="update_profile" value="1">
-      <div class="form-row">
-        <div class="form-group mb-2">
-          <label for="u_name">Name</label>
-          <input id="u_name" name="name" class="form-control" value="<?php echo htmlspecialchars($user['name']) ?>" required>
-        </div>
-        <div class="form-group mb-2">
-          <label for="u_username">Username</label>
-          <input id="u_username" name="username" class="form-control" value="<?php echo htmlspecialchars($user['username']) ?>" required>
+
+      <!-- Full name split row -->
+      <div class="form-row" style="margin-bottom:12px;">
+        <div class="label-col">Full name <span class="small-muted">(required)</span></div>
+        <div class="input-col">
+          <div class="split-name">
+            <input name="first_name" class="form-control" placeholder="First name" value="<?php echo htmlspecialchars($first_name) ?>">
+            <input name="last_name" class="form-control" placeholder="Last name" value="<?php echo htmlspecialchars($last_name) ?>">
+          </div>
         </div>
       </div>
 
-      <div class="form-row">
-        <div class="form-group mb-2">
-          <label for="u_role">Role</label>
-          <select id="u_role" name="role" class="form-control">
-            <option value="Head BHW" <?php if($user['role']==='Head BHW') echo 'selected' ?>>Head BHW</option>
-            <option value="BHW" <?php if($user['role']==='BHW') echo 'selected' ?>>BHW</option>
-          </select>
-        </div>
-        <div class="form-group mb-2">
-          <label for="u_status">Status</label>
-          <select id="u_status" name="status" class="form-control">
-            <option value="Active" <?php if($user['status']==='Active') echo 'selected' ?>>Active</option>
-            <option value="Inactive" <?php if($user['status']==='Inactive') echo 'selected' ?>>Inactive</option>
-          </select>
+      <!-- Username (disabled display but still editable if Head BHW) -->
+      <div class="form-row" style="margin-bottom:12px;">
+        <div class="label-col">Username</div>
+        <div class="input-col">
+          <?php if ($current_role === 'Head BHW'): ?>
+            <input name="username" class="form-control" value="<?php echo htmlspecialchars($user['username']) ?>">
+          <?php else: ?>
+            <input class="form-control" value="<?php echo htmlspecialchars($user['username']) ?>" disabled>
+          <?php endif; ?>
         </div>
       </div>
 
-      <div class="d-flex justify-content-end mt-2" style="margin-top:.5rem;">
-        <button type="submit" class="btn btn-primary btn-modal">Save Changes</button>
-        <button type="button" class="btn btn-outline-secondary" data-close>Cancel</button>
+      <!-- Email (not in provided data - show empty placeholder) 
+      <div class="form-row" style="margin-bottom:12px;">
+        <div class="label-col">Email</div>
+        <div class="input-col"><input class="form-control" name="email" value="<?php echo htmlspecialchars($user['email'] ?? '') ?>" placeholder="you@example.com"></div>
+      </div>
+
+      Phone 
+      <div class="form-row" style="margin-bottom:12px;">
+        <div class="label-col">Phone <span class="small-muted">(Optional)</span></div>
+        <div class="input-col"><input class="form-control" name="phone" value="<?php echo htmlspecialchars($user['phone'] ?? '') ?>" placeholder="+63 (9xx) xxx-xxxx"></div>
+      </div>
+
+    -->
+  
+      <!-- Role and Status (only editable by Head BHW) -->
+      <div class="form-row" style="margin-bottom:12px;">
+        <div class="label-col">Role</div>
+        <div class="input-col">
+          <?php if ($current_role === 'Head BHW'): ?>
+            <select name="role" class="form-control">
+              <option value="Head BHW" <?php if ($user['role']==='Head BHW') echo 'selected'; ?>>Head BHW</option>
+              <option value="BHW" <?php if ($user['role']==='BHW') echo 'selected'; ?>>BHW</option>
+            </select>
+          <?php else: ?>
+            <input class="form-control" value="<?php echo htmlspecialchars($user['role']) ?>" disabled>
+          <?php endif; ?>
+        </div>
+      </div>
+
+      <div class="form-row" style="margin-bottom:6px;">
+        <div class="label-col">Status</div>
+        <div class="input-col">
+          <?php if ($current_role === 'Head BHW'): ?>
+            <select name="status" class="form-control">
+              <option value="Active" <?php if ($user['status']==='Active') echo 'selected'; ?>>Active</option>
+              <option value="Inactive" <?php if ($user['status']==='Inactive') echo 'selected'; ?>>Inactive</option>
+            </select>
+          <?php else: ?>
+            <input class="form-control" value="<?php echo htmlspecialchars($user['status']) ?>" disabled>
+          <?php endif; ?>
+        </div>
+      </div>
+
+      <!-- Form actions -->
+      <div style="display:flex; justify-content:flex-end; margin-top:12px; gap:10px;">
+        <button type="button" class="btn-ghost" onclick="location.reload();">Cancel</button>
+        <?php if ($current_role === 'Head BHW'): ?>
+          <button type="submit" name="update_profile" class="btn-primary">Save changes</button>
+        <?php else: ?>
+          <button type="button" class="btn-primary" disabled>Save changes</button>
+        <?php endif; ?>
       </div>
     </form>
   </div>
-</div>
-<?php endif; ?>
 
-<!-- JS for modal open/close and auto-open on validation error -->
+  <!-- small meta card -->
+  <div style="margin-top:12px;">
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div>
+          <div style="font-weight:700;">Account details</div>
+          <div class="small-muted" style="margin-top:6px;">
+            User ID: <?php echo (int)$user['user_id'] ?> &nbsp; • &nbsp; Created: <?php echo htmlspecialchars($user['date_created']) ?>
+          </div>
+        </div>
+        <div style="text-align:right;">
+          <div><strong><?php echo htmlspecialchars($user['username']) ?></strong></div>
+          <div class="small-muted"><?php echo htmlspecialchars($user['role']) ?></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Change password: full-width card like screenshot -->
+  <div class="card" style="margin-top:14px;">
+    <div class="card-title">Change your password</div>
+
+    <div style="display:flex; gap:18px; align-items:flex-start; flex-wrap:wrap;">
+      <form method="post" style="flex:1 1 60%; min-width:320px;">
+        <input type="hidden" name="change_pass" value="1">
+        <div class="form-row" style="margin-bottom:12px;">
+          <div class="label-col">Current password</div>
+          <div class="input-col"><input class="form-control" type="password" name="current_password" placeholder="Enter current password" required></div>
+        </div>
+
+        <div class="form-row" style="margin-bottom:12px;">
+          <div class="label-col">New password</div>
+          <div class="input-col"><input id="new_password" class="form-control" type="password" name="new_password" placeholder="Enter new password" required></div>
+        </div>
+
+        <div class="form-row" style="margin-bottom:6px;">
+          <div class="label-col">Confirm new password</div>
+          <div class="input-col"><input id="confirm_password" class="form-control" type="password" name="confirm_password" placeholder="Confirm your new password" required></div>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; margin-top:10px;">
+          <button type="submit" name="change_pass" class="btn-primary">Save Changes</button>
+        </div>
+      </form>
+
+    
+    </div>
+  </div>
+
+</div>
+
+
+
+<!-- JS: password live checks & small helpers -->
 <script>
 (function(){
-  const body = document.body;
-  const modal = document.getElementById('editProfileModal');
-  if (!modal) return;
-  const form = document.getElementById('editProfileForm');
+  var newPw = document.getElementById('new_password');
+  var confirmPw = document.getElementById('confirm_password');
+  var reqLength = document.getElementById('req-length');
+  var reqLower = document.getElementById('req-lower');
+  var reqUpper = document.getElementById('req-upper');
+  var reqDigit = document.getElementById('req-digit');
 
-  function openModal() {
-    modal.classList.add('show');
-    body.classList.add('modal-open');
-    modal.setAttribute('aria-hidden','false');
-    const first = document.getElementById('u_name');
-    if(first) { setTimeout(()=> first.focus(),50); }
+  function testPw(){
+    if (!newPw) return;
+    var v = newPw.value || '';
+    var okLen = v.length >= 8;
+    var okLower = /[a-z]/.test(v);
+    var okUpper = /[A-Z]/.test(v);
+    var okDigit = /[0-9\W_]/.test(v);
+
+    if (reqLength) reqLength.style.opacity = okLen ? 0.9 : 0.35;
+    if (reqLower) reqLower.style.opacity = okLower ? 0.9 : 0.35;
+    if (reqUpper) reqUpper.style.opacity = okUpper ? 0.9 : 0.35;
+    if (reqDigit) reqDigit.style.opacity = okDigit ? 0.9 : 0.35;
   }
-  function closeModal() {
-    modal.classList.remove('show');
-    body.classList.remove('modal-open');
-    modal.setAttribute('aria-hidden','true');
-  }
+  if (newPw) newPw.addEventListener('input', testPw);
+  if (confirmPw) confirmPw.addEventListener('input', testPw);
 
-  // wire close buttons
-  document.querySelectorAll('[data-close]').forEach(btn=> btn.addEventListener('click', ()=> closeModal()));
-
-  // clicking backdrop outside panel closes modal
-  modal.addEventListener('click', function(e){
-    if (e.target === this) closeModal();
-  });
-
-  // intercept the Edit Details link to open modal (fallback link left for no-JS)
-  const openBtn = document.getElementById('openEditBtn');
-  if (openBtn) openBtn.addEventListener('click', function(e){
-    e.preventDefault();
-    // populate form fields from displayed values (in case values changed)
-    const nameCell = '<?php echo addslashes($user['name']); ?>';
-    const usernameCell = '<?php echo addslashes($user['username']); ?>';
-    document.getElementById('u_name').value = nameCell;
-    document.getElementById('u_username').value = usernameCell;
-    // set selects (they already render server-side with correct selected options)
-    openModal();
-  });
-
-  // Optionally auto-open when server-side validation triggered
-  var showModal = <?php echo ($show_modal && $current_role === 'Head BHW') ? 'true' : 'false'; ?>;
-  if (showModal) {
-    // open on DOM ready
-    document.addEventListener('DOMContentLoaded', function(){
-      openModal();
-    });
-  }
-
-  // allow Escape to close
-  document.addEventListener('keydown', function(e){
-    if (e.key === 'Escape' && modal.classList.contains('show')) closeModal();
-  });
+  // optional: when Head BHW clicks "Save changes" ensure first+last are combined if needed
+  // (server already handles concatenation)
 })();
 </script>
+
+<?php require 'footer.php'; ?>

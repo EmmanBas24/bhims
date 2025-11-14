@@ -6,12 +6,32 @@ $current_role = $_SESSION['role'] ?? '';
 ?>
 <!doctype html>
 <html>
+
+<style>
+   .logo-wrapper {
+    width: 40px;
+    height: 40px;
+    background: #fff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border-radius: 8px;
+    margin-right: 8px;
+   }
+   
+    .logo-wrapper .logo {
+      width: 24px;
+      height: 24px;
+    }
+</style>
+
 <head>
   <meta charset="utf-8">
   <title>BHIS</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
   <link href="assets/css/style.css" rel="stylesheet">
+ <link rel='stylesheet' href='https://cdn-uicons.flaticon.com/3.0.0/uicons-solid-rounded/css/uicons-solid-rounded.css'>
 </head>
 <body>
 <nav class="navbar navbar-expand-lg topnav">
@@ -19,7 +39,9 @@ $current_role = $_SESSION['role'] ?? '';
 
     <!-- LEFT: Logo -->
     <a class="navbar-brand d-flex align-items-center" href="dashboard.php">
-      <i class="bi bi-hospital-fill me-2"></i> BHIS
+      <div class="logo-wrapper">
+        <img src="img/logo/logo.png" alt="" class="logo">
+      </div> BHIMS
     </a>
 
     <!-- RIGHT: Profile Dropdown -->
@@ -57,7 +79,7 @@ $current_role = $_SESSION['role'] ?? '';
 
       <li class="nav-item"><a class="nav-link <?php echo basename($_SERVER['PHP_SELF'])=='medicine.php' ? 'active':'' ?>" href="medicine.php"><i class="bi bi-capsule"></i> Medicine</a></li>
       <li class="nav-item"><a class="nav-link <?php echo basename($_SERVER['PHP_SELF'])=='supplies.php' ? 'active':'' ?>" href="supplies.php"><i class="bi bi-box-seam"></i> Supplies</a></li>
-      <li class="nav-item"><a class="nav-link <?php echo basename($_SERVER['PHP_SELF'])=='equipment.php' ? 'active':'' ?>" href="equipment.php"><i class="bi bi-tools"></i> Equipment</a></li>
+      <li class="nav-item"><a class="nav-link <?php echo basename($_SERVER['PHP_SELF'])=='equipment.php' ? 'active':'' ?>" href="equipment.php"> <i class="fi fi-sr-stethoscope"></i>Equipment</a></li>
       <li class="nav-item"><a class="nav-link <?php echo basename($_SERVER['PHP_SELF'])=='issuance.php' ? 'active':'' ?>" href="issuance.php"><i class="bi bi-send-fill"></i> Issuance</a></li>
 
       <?php if ($current_role === 'Head BHW'): ?>
@@ -69,7 +91,7 @@ $current_role = $_SESSION['role'] ?? '';
 
       <li class="nav-item"><a class="nav-link <?php echo basename($_SERVER['PHP_SELF'])=='logs.php' ? 'active':'' ?>" href="logs.php"><i class="bi bi-clock-history"></i> Activity Logs</a></li>
       <li class="nav-item"><a class="nav-link <?php echo basename($_SERVER['PHP_SELF'])=='profile.php' ? 'active':'' ?>" href="profile.php"><i class="bi bi-person-circle"></i> Profile</a></li>
-      <li class="nav-item mt-2"><a class="nav-link text-danger" href="logout.php"><i class="bi bi-box-arrow-right"></i> Logout</a></li>
+      <li class="nav-item mt-2"><a class="nav-link logout" href="logout.php"><i class="bi bi-box-arrow-right"></i> Logout</a></li>
     </ul>
   </div>
 
