@@ -1,48 +1,110 @@
 <?php
 require_once 'header.php';
 require_once 'functions.php';
+require_login();
 
-
-// SERVER-SIDE ROLE CHECK: only Head BHW can access reports
+// ACCESS CONTROL: Only Head BHW
 if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'Head BHW') {
-    // show friendly error and stop executing the rest of the page
-    echo '<div class="alert alert-danger">Access denied. Reports are available to Head BHW only.</div>';
+    echo "<div class='alert alert-danger m-4'>Access denied. Reports are available only to Head BHW.</div>";
     require 'footer.php';
     exit;
 }
-$which = $_GET['which'] ?? 'medicine';
-if ($which === 'medicine') {
-    $stmt = $mysqli->prepare('SELECT * FROM medicine');
-} elseif ($which === 'supplies') {
-    $stmt = $mysqli->prepare('SELECT * FROM supplies');
-} else {
-    $stmt = $mysqli->prepare('SELECT * FROM equipment');
-}
-$stmt->execute(); $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC); $stmt->close();
+
+// CURRENT MONTH default
+$currentMonth = date('m');
+$selectedMonth = $_GET['month'] ?? $currentMonth;
+
+// Fetch issuance data for selected month
+$stmt = $mysqli->prepare("
+    SELECT issue_id, item_name, quantity_issued, issued_to, purpose, date_issued 
+    FROM issuance 
+    WHERE MONTH(date_issued) = ?
+    ORDER BY date_issued DESC
+");
+
+$stmt->bind_param('i', $selectedMonth);
+$stmt->execute();
+$result = $stmt->get_result();
+$rows = $result->fetch_all(MYSQLI_ASSOC);
+$stmt->close();
+
+// Month names for dropdown
+$months = [
+    1=>"January",2=>"February",3=>"March",4=>"April",5=>"May",6=>"June",
+    7=>"July",8=>"August",9=>"September",10=>"October",11=>"November",12=>"December"
+];
 ?>
-<h3>Reports - <?php echo htmlspecialchars(ucfirst($which)) ?></h3>
-<div class="mb-2">
-  <a class="btn btn-sm btn-outline-primary" href="?which=medicine">Medicine</a>
-  <a class="btn btn-sm btn-outline-primary" href="?which=supplies">Supplies</a>
-  <a class="btn btn-sm btn-outline-primary" href="?which=equipment">Equipment</a>
-  <button onclick="window.print()" class="btn btn-sm btn-success">Print / Save as PDF</button>
+
+<style>
+/* Hide buttons and sidebar during print */
+@media print {
+    .no-print, nav, .bg-light, .sidebar, .btn, .form-select {
+        display: none !important;
+    }
+    body {
+        background: white;
+    }
+}
+</style>
+
+<div class="container-fluid mt-4">
+    <h4 class="text-center fw-bold">Barangay Health Inventory System</h4>
+    <h5 class="text-center">Issued Items Report</h5>
+    <h6 class="text-center mb-4">Month: <?php echo $months[intval($selectedMonth)]; ?></h6>
+
+    <!-- Filter + Print Button -->
+    <div class="d-flex justify-content-between align-items-center mb-3 no-print">
+        <form method="GET" class="d-flex">
+            <select name="month" class="form-select me-2" required>
+                <?php foreach ($months as $num => $name): ?>
+                    <option value="<?php echo $num; ?>" <?php if ($num == $selectedMonth) echo 'selected'; ?>>
+                        <?php echo $name; ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+
+            <button class="btn btn-primary">Filter</button>
+        </form>
+
+        <button class="btn btn-success no-print" onclick="window.print()">Print / Save as PDF</button>
+    </div>
+
+    <!-- Table -->
+    <div class="table-responsive">
+        <table class="table table-sm table-striped table-bordered">
+            <thead class="table-dark">
+                <tr>
+                    <th>Issue ID</th>
+                    <th>Resident Name</th>
+                    <th>Item Name</th>
+                    <th>Quantity</th>
+                    <th>Purpose</th>
+                    <th>Date Issued</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php if (empty($rows)): ?>
+                    <tr>
+                        <td colspan="6" class="text-center text-muted">
+                            No records found for this month.
+                        </td>
+                    </tr>
+                <?php else: ?>
+                    <?php foreach ($rows as $r): ?>
+                    <tr>
+                        <td><?php echo $r['issue_id']; ?></td>
+                        <td><?php echo htmlspecialchars($r['issued_to']); ?></td>
+                        <td><?php echo htmlspecialchars($r['item_name']); ?></td>
+                        <td><?php echo $r['quantity_issued']; ?></td>
+                        <td><?php echo htmlspecialchars($r['purpose']); ?></td>
+                        <td><?php echo date("F d, Y", strtotime($r['date_issued'])); ?></td>
+                    </tr>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
+
 </div>
-<table class="table table-sm">
-  <thead><tr>
-    <?php if ($which === 'medicine'): ?><th>Code</th><th>Name</th><th>Expiry</th><th>Qty</th><?php else: ?><th>Code</th><th>Name</th><th>Qty</th><?php endif; ?>
-    <th>Supplier</th><th>Date Received</th>
-  </tr></thead>
-  <tbody>
-  <?php foreach ($rows as $r): ?>
-    <tr>
-      <td><?php echo htmlspecialchars($r['item_code']) ?></td>
-      <td><?php echo htmlspecialchars($r['item_name']) ?></td>
-      <?php if ($which === 'medicine'): ?><td><?php echo htmlspecialchars($r['expiry_date']) ?></td><?php endif; ?>
-      <td><?php echo htmlspecialchars($r['quantity'] ?? '') ?></td>
-      <td><?php echo htmlspecialchars($r['supplier']) ?></td>
-      <td><?php echo htmlspecialchars($r['date_received']) ?></td>
-    </tr>
-  <?php endforeach; ?>
-  </tbody>
-</table>
+
 <?php require 'footer.php'; ?>

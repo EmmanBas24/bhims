@@ -5,6 +5,21 @@ $user_id = $_SESSION['user_id'];
 
 $action = $_GET['action'] ?? 'list';
 
+// categories available for issuance filter
+$categories = ['Medicine', 'Supply'];
+
+// fetch distinct months present in issuance (format: YYYY-MM) for the month filter dropdown
+$month_options = [];
+$mstmt = $mysqli->prepare("SELECT DISTINCT DATE_FORMAT(date_issued, '%Y-%m') AS ym FROM issuance WHERE date_issued IS NOT NULL ORDER BY ym DESC");
+if ($mstmt !== false) {
+    $mstmt->execute();
+    $res = $mstmt->get_result();
+    while ($r = $res->fetch_assoc()) {
+        if (!empty($r['ym'])) $month_options[] = $r['ym'];
+    }
+    $mstmt->close();
+}
+
 // --- Server-side CRUD / Issue logic ---
 if ($action === 'add' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $category = $_POST['category'] ?? '';
@@ -17,7 +32,6 @@ if ($action === 'add' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     // Insert issuance with date_issued = NOW()
     $stmt = $mysqli->prepare('INSERT INTO issuance (category,item_code,item_name,quantity_issued,issued_to,purpose,issued_by,date_issued) VALUES (?,?,?,?,?,?,?,NOW())');
     if ($stmt === false) { die('Prepare failed: ' . $mysqli->error); }
-    // types: s, s, s, i, s, s, i
     $stmt->bind_param('sssissi', $category, $item_code, $item_name, $quantity_issued, $issued_to, $purpose, $user_id);
     $stmt->execute();
     $stmt->close();
@@ -55,10 +69,36 @@ if ($action === 'delete') {
     header('Location: issuance.php'); exit;
 }
 
-// Listing (default)
-$stmt = $mysqli->prepare('SELECT i.*, u.name as issuer FROM issuance i LEFT JOIN users u ON i.issued_by = u.user_id ORDER BY date_issued DESC');
+// Listing (default) with filters: category and month (YYYY-MM)
+$category_filter = $_GET['category'] ?? '';
+$month_filter = $_GET['month'] ?? ''; // expected format: YYYY-MM
+
+$sql = "SELECT i.*, u.name as issuer FROM issuance i LEFT JOIN users u ON i.issued_by = u.user_id WHERE 1=1";
+$params = [];
+$types = '';
+
+if ($category_filter !== '') {
+    $sql .= " AND i.category = ?";
+    $params[] = $category_filter;
+    $types .= 's';
+}
+if ($month_filter !== '') {
+    // use DATE_FORMAT on date_issued to match YYYY-MM
+    $sql .= " AND DATE_FORMAT(i.date_issued, '%Y-%m') = ?";
+    $params[] = $month_filter;
+    $types .= 's';
+}
+
+$sql .= " ORDER BY i.date_issued DESC, i.issue_id DESC";
+
+$stmt = $mysqli->prepare($sql);
 if ($stmt === false) { die('Prepare failed: ' . $mysqli->error); }
-$stmt->execute(); $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC); $stmt->close();
+if (!empty($params)) {
+    $stmt->bind_param($types, ...$params);
+}
+$stmt->execute();
+$rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+$stmt->close();
 ?>
 
 <!-- Styles: consistent card/table/modal system -->
@@ -72,11 +112,6 @@ $stmt->execute(); $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC); $stmt->c
   .btn-secondary{background:#6c757d;color:#fff;border-color:#6c757d}
   .btn-danger{background:#dc3545;color:#fff;border-color:#dc3545}
   .btn-outline-secondary{background:transparent;color:#495057;border-color:#ced4da}
-
-  .table{width:100%;border-collapse:collapse;font-size:.95rem}
-  .table thead th{padding:.6rem .75rem;border-bottom:1px solid #e9ecef;color:#495057;font-weight:600;text-align:left}
-  .table tbody td{padding:.6rem .75rem;border-bottom:1px solid #f1f3f5;vertical-align:middle}
-  .table tr:hover td{background:#fbfdff}
 
   .badge-med{display:inline-block;padding:.25rem .5rem;border-radius:999px;background:#e6f4ff;color:#0b5bd7;font-weight:600;font-size:.82rem}
   .badge-sup{display:inline-block;padding:.25rem .5rem;border-radius:999px;background:#eaf6ea;color:#0b7a3a;font-weight:600;font-size:.82rem}
@@ -102,7 +137,29 @@ $stmt->execute(); $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC); $stmt->c
 <div class="table-card">
   <div class="d-flex justify-content-between align-items-center mb-2">
     <div class="table-actions">
-      <!-- placeholder for filters/search -->
+      <form method="get" class="d-flex" style="gap:8px; align-items:center;">
+        <!-- Category filter -->
+        <select name="category" class="form-control form-control-sm">
+          <option value="">All categories</option>
+          <?php foreach ($categories as $c): ?>
+            <option value="<?php echo htmlspecialchars($c) ?>" <?php if($category_filter===$c) echo 'selected' ?>><?php echo htmlspecialchars($c) ?></option>
+          <?php endforeach; ?>
+        </select>
+
+        <!-- Month filter (YYYY-MM) -->
+        <select name="month" class="form-control form-control-sm">
+          <option value="">All months</option>
+          <?php foreach ($month_options as $ym): 
+              // pretty label: convert YYYY-MM to "Month YYYY"
+              $label = DateTime::createFromFormat('!Y-m', $ym) ? DateTime::createFromFormat('!Y-m', $ym)->format('F Y') : $ym;
+          ?>
+            <option value="<?php echo htmlspecialchars($ym) ?>" <?php if($month_filter===$ym) echo 'selected' ?>><?php echo htmlspecialchars($label) ?></option>
+          <?php endforeach; ?>
+        </select>
+
+        <button class="btn btn-sm btn-primary">Filter</button>
+        <a href="issuance.php" class="btn btn-sm btn-outline-secondary">Reset</a>
+      </form>
     </div>
 
     <div>
@@ -110,8 +167,8 @@ $stmt->execute(); $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC); $stmt->c
     </div>
   </div>
 
-  <div class="table-responsive">
-    <table class="table table-sm">
+   <div class="table-responsive">
+    <table class="table table-modern w-100">
       <thead>
         <tr>
           <th>Category</th>
@@ -128,42 +185,32 @@ $stmt->execute(); $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC); $stmt->c
           <tr><td colspan="7">No records found.</td></tr>
         <?php else: foreach ($rows as $r): ?>
           <tr>
-            <td>
+            <td style="width:110px;">
               <?php
                 $cat = $r['category'] ?? '';
                 if (strtolower($cat) === 'medicine') echo '<span class="badge-med">Medicine</span>';
                 else echo '<span class="badge-sup">Supply</span>';
               ?>
             </td>
-            <td><?php echo htmlspecialchars($r['item_name']) ?> <div style="color:#6c757d;font-size:.85rem;"><?php echo htmlspecialchars($r['item_code']) ?></div></td>
-            <td><?php echo (int)$r['quantity_issued'] ?></td>
-            <td><?php echo htmlspecialchars($r['issued_to']) ?></td>
-            <td><?php echo htmlspecialchars($r['issuer'] ?? '') ?></td>
-            <td><?php echo htmlspecialchars($r['date_issued']) ?></td>
             <td>
-              <?php
-                // data-* for potential future edit modal
-                $data_attrs = [
-                  'id' => $r['issue_id'],
-                  'category' => $r['category'],
-                  'item_code' => $r['item_code'],
-                  'item_name' => $r['item_name'],
-                  'quantity_issued' => $r['quantity_issued'],
-                  'issued_to' => $r['issued_to'],
-                  'purpose' => $r['purpose']
-                ];
-                $data_str = '';
-                foreach ($data_attrs as $k => $v) {
-                    $data_str .= ' data-'.$k.'="'.htmlspecialchars($v, ENT_QUOTES).'"';
-                }
-              ?>
-              <a class="btn btn-sm btn-danger" href="issuance.php?action=delete&id=<?php echo $r['issue_id']?>" onclick="return confirm('Delete?')">Delete</a>
+              <div style="font-weight:600;"><?php echo htmlspecialchars($r['item_name']) ?></div>
+              <div style="color:#6c757d;font-size:.85rem;"><?php echo htmlspecialchars($r['item_code']) ?></div>
+            </td>
+            <td style="width:70px;"><?php echo (int)$r['quantity_issued'] ?></td>
+            <td style="width:160px;"><?php echo htmlspecialchars($r['issued_to']) ?></td>
+            <td style="width:140px;"><?php echo htmlspecialchars($r['issuer'] ?? '') ?></td>
+            <td style="width:160px;"><?php echo htmlspecialchars($r['date_issued']) ?></td>
+            <td style="width:120px;">
+              <div style="display:flex;gap:8px;align-items:center;justify-content:flex-end;">
+                <a class="btn btn-sm btn-danger" href="issuance.php?action=delete&id=<?php echo $r['issue_id']?>" onclick="return confirm('Delete?')">Delete</a>
+              </div>
             </td>
           </tr>
         <?php endforeach; endif; ?>
       </tbody>
     </table>
   </div>
+
 </div>
 
 <!-- Unified Modal for Issue -->

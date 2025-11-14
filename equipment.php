@@ -16,7 +16,6 @@ if ($action === 'add' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $stmt = $mysqli->prepare('INSERT INTO equipment (item_code,item_name,quantity,supplier,`condition`,status,date_received,added_by,created_at) VALUES (?,?,?,?,?,?,?,?,NOW())');
     if ($stmt === false) { die('Prepare failed: ' . $mysqli->error); }
-    // types: s item_code, s item_name, i quantity, s supplier, s condition, s status, s date_received, i added_by
     $stmt->bind_param('ssissssi', $item_code, $item_name, $quantity, $supplier, $condition, $status, $date_received, $user_id);
     $stmt->execute(); $stmt->close();
     log_activity($user_id, 'Added equipment: ' . $item_name);
@@ -33,15 +32,8 @@ if ($action === 'edit' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $status = $_POST['status'] ?? 'Available';
     $date_received = $_POST['date_received'] ?? null;
 
-    $stmt = $mysqli->prepare('UPDATE equipment SET item_code=?,item_name=?,quantity=?,supplier=`supplier`=?,`condition`=?,status=?,date_received=?,added_by=?,updated_at=NOW() WHERE equipment_id=?');
-    // Note: MySQL column names with reserved words should be escaped; here we used backticks around 'condition' earlier and supplier assignment was mistakenly using backticks - fix below.
-    if ($stmt === false) {
-        // The prepared query above intentionally included a mistake to avoid silent failures in some DB setups.
-        // Re-prepare the correct query:
-        $stmt = $mysqli->prepare('UPDATE equipment SET item_code=?, item_name=?, quantity=?, supplier=?, `condition`=?, status=?, date_received=?, added_by=?, updated_at=NOW() WHERE equipment_id=?');
-        if ($stmt === false) { die('Prepare failed: ' . $mysqli->error); }
-    }
-    // types: s, s, i, s, s, s, s, i, i
+    $stmt = $mysqli->prepare('UPDATE equipment SET item_code=?, item_name=?, quantity=?, supplier=?, `condition`=?, status=?, date_received=?, added_by=?, updated_at=NOW() WHERE equipment_id=?');
+    if ($stmt === false) { die('Prepare failed: ' . $mysqli->error); }
     $stmt->bind_param('ssissssii', $item_code, $item_name, $quantity, $supplier, $condition, $status, $date_received, $user_id, $id);
     $stmt->execute(); $stmt->close();
     log_activity($user_id, 'Updated equipment ID ' . $id);
@@ -58,14 +50,28 @@ if ($action === 'delete') {
     header('Location: equipment.php'); exit;
 }
 
-// Listing (default)
-$stmt = $mysqli->prepare('SELECT * FROM equipment ORDER BY date_received DESC, equipment_id DESC');
+// Listing (with search + status filter to match medicine UI)
+$search = trim($_GET['search'] ?? '');
+$status_filter = $_GET['status'] ?? '';
+
+$sql = "SELECT * FROM equipment WHERE 1=1";
+$params = [];
+$types = '';
+if ($search !== '') { $sql .= " AND item_name LIKE ?"; $params[] = "%$search%"; $types .= 's'; }
+if ($status_filter !== '') { $sql .= " AND status = ?"; $params[] = $status_filter; $types .= 's'; }
+$sql .= " ORDER BY updated_at DESC, date_received DESC, equipment_id DESC";
+
+$stmt = $mysqli->prepare($sql);
 if ($stmt === false) { die('Prepare failed: ' . $mysqli->error); }
-$stmt->execute(); $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC); $stmt->close();
+if (!empty($params)) { $stmt->bind_param($types, ...$params); }
+$stmt->execute();
+$rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+$stmt->close();
 ?>
 
-<!-- Styles: modal + table card + badges (same visual system as supplies.php) -->
+<!-- Styles: modal + table card + badges (consistent with medicine.php) -->
 <style>
+  /* card + buttons + modal (keep your existing rules) */
   .table-card { background:#fff; border-radius:10px; padding:1rem; box-shadow:0 8px 24px rgba(0,0,0,0.06); }
   .d-flex{display:flex}.justify-content-between{justify-content:space-between}.align-items-center{align-items:center}
   .mb-2{margin-bottom:.5rem}.btn{display:inline-flex;align-items:center;gap:.5rem;padding:.375rem .6rem;border-radius:6px;border:1px solid transparent;text-decoration:none;cursor:pointer}
@@ -73,18 +79,10 @@ $stmt->execute(); $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC); $stmt->c
   .btn-primary{background:#0d6efd;color:#fff;border-color:#0d6efd}
   .btn-success{background:#198754;color:#fff;border-color:#198754}
   .btn-secondary{background:#6c757d;color:#fff;border-color:#6c757d}
-  .btn-danger{background:#dc3545;color:#fff;border-color:#dc3545}
   .btn-outline-secondary{background:transparent;color:#495057;border-color:#ced4da}
+  .btn-outline-danger{background:transparent;color:#dc3545;border:1px solid rgba(220,53,69,0.12)}
 
-  .table{width:100%;border-collapse:collapse;font-size:.95rem}
-  .table thead th{padding:.6rem .75rem;border-bottom:1px solid #e9ecef;color:#495057;font-weight:600;text-align:left}
-  .table tbody td{padding:.6rem .75rem;border-bottom:1px solid #f1f3f5;vertical-align:middle}
-  .table tr:hover td{background:#fbfdff}
-
-  .badge-good{display:inline-block;padding:.25rem .5rem;border-radius:999px;background:#e8f7e9;color:#116622;font-weight:600;font-size:.82rem}
-  .badge-bad{display:inline-block;padding:.25rem .5rem;border-radius:999px;background:#fff4e6;color:#b36b00;font-weight:600;font-size:.82rem}
-  .badge-damaged{display:inline-block;padding:.25rem .5rem;border-radius:999px;background:#ffecec;color:#c21c1c;font-weight:600;font-size:.82rem}
-
+  /* Modal backdrop & panel */
   .modal-backdrops{position:fixed;inset:0;background:rgba(0,0,0,0.45);display:none;z-index:1050;align-items:center;justify-content:center;padding:1rem}
   .modal-backdrops.show{display:flex}
   .modal-panel{background:#fff;border-radius:10px;width:100%;max-width:720px;box-shadow:0 10px 30px rgba(0,0,0,0.25);z-index:1060;padding:1.25rem;max-height:90vh;overflow:auto}
@@ -95,29 +93,71 @@ $stmt->execute(); $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC); $stmt->c
   .form-row .form-group{flex:1;min-width:180px}
   .btn-modal{margin-right:8px}
   body.modal-open{overflow:hidden}
-  @media (max-width:600px){.modal-panel{padding:.75rem;border-radius:8px}}
   label{display:block;font-size:.9rem;margin-bottom:.25rem;color:#333}
   input.form-control,select.form-control{width:100%;padding:.45rem .5rem;border:1px solid #dfe3e6;border-radius:6px}
+  @media (max-width:600px){.modal-panel{padding:.75rem;border-radius:8px}}
+
+  /* Table styles: modern card-like rows */
+  .table.table-modern {
+    border-collapse: separate;
+    border-spacing: 0 10px;
+    width: 100%;
+  }
+  .table-modern thead th {
+    background: transparent;
+    color: #0b4f6c;
+    font-weight: 700;
+    border: 0;
+    padding: 10px 12px;
+    text-align: left;
+  }
+  .table-modern tbody tr {
+    background: #fbfdff;
+    border-radius: 8px;
+    box-shadow: 0 3px 8px rgba(10, 20, 30, 0.03);
+  }
+  /* ensure cells look like a single rounded row */
+  .table-modern tbody tr td {
+    vertical-align: middle;
+    padding: 12px;
+    border: 0;
+    background: transparent;
+  }
+  /* keep small-device readability */
+  @media (max-width:600px) {
+    .table-modern thead th { padding: 8px; font-size: .9rem; }
+    .table-modern tbody tr td { padding: 10px; font-size: .95rem; }
+  }
 </style>
 
-<h3 style="margin-bottom:.5rem;">Equipment</h3>
+
+<h3>Health Equipments</h3>
 
 <div class="table-card">
   <div class="d-flex justify-content-between align-items-center mb-2">
     <div class="table-actions">
-      <!-- add filters/search here if desired -->
+      <form class="d-flex" method="get" style="gap:8px; align-items:center;">
+        <input name="search" value="<?php echo htmlspecialchars($search) ?>" placeholder="Search equipment..." class="form-control form-control-sm" style="padding:.35rem .5rem;">
+        <select name="status" class="form-control form-control-sm" style="padding:.35rem .5rem;">
+          <option value="">All status</option>
+          <option value="Available" <?php if($status_filter==='Available') echo 'selected' ?>>Available</option>
+          <option value="Unavailable" <?php if($status_filter==='Unavailable') echo 'selected' ?>>Unavailable</option>
+        </select>
+        <button class="btn btn-sm btn-primary">Filter</button>
+        <a href="equipment.php" class="btn btn-sm btn-outline-secondary">Reset</a>
+      </form>
     </div>
 
     <div>
-      <a id="openUnifiedBtn" href="equipment.php?action=add" class="btn btn-sm btn-success"><span>＋</span> Add Equipment</a>
+      <a id="openUnifiedBtn" href="equipment.php?action=add" class="btn btn-sm btn-success"><span style="font-weight:700;">＋</span> Add Equipment</a>
     </div>
   </div>
 
   <div class="table-responsive">
-    <table class="table table-sm">
+    <table class="table table-modern w-100">
       <thead>
         <tr>
-          <th>Item Code</th>
+          <th>Code</th>
           <th>Name</th>
           <th>Qty</th>
           <th>Supplier</th>
@@ -140,7 +180,7 @@ $stmt->execute(); $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC); $stmt->c
               <?php
                 $cond = $r['condition'] ?? '';
                 if ($cond === 'Good') echo '<span class="badge-good">Good</span>';
-                elseif ($cond === 'Broken') echo '<span class="badge-bad">Broken</span>';
+                elseif ($cond === 'Broken') echo '<span class="badge-broken">Broken</span>';
                 else echo '<span class="badge-damaged">'.htmlspecialchars($cond).'</span>';
               ?>
             </td>
@@ -163,8 +203,8 @@ $stmt->execute(); $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC); $stmt->c
                     $data_str .= ' data-'.$k.'="'.htmlspecialchars($v, ENT_QUOTES).'"';
                 }
               ?>
-              <a class="btn btn-sm btn-outline-secondary openUnifiedEdit" href="equipment.php?action=edit&id=<?php echo $r['equipment_id'] ?>" <?php echo $data_str; ?> title="Edit">Edit</a>
-              <a class="btn btn-sm btn-danger" href="equipment.php?action=delete&id=<?php echo $r['equipment_id'] ?>" onclick="return confirm('Delete?')">Delete</a>
+              <a class="btn btn-sm btn-outline-secondary openUnifiedEdit" href="equipment.php?action=edit&id=<?php echo $r['equipment_id'] ?>" <?php echo $data_str; ?> title="Edit"><i class="bi bi-pencil"></i></a>
+              <a class="btn btn-sm btn-outline-danger" href="equipment.php?action=delete&id=<?php echo $r['equipment_id'] ?>" onclick="return confirm('Delete?')"><i class="bi bi-trash"></i></a>
             </td>
           </tr>
         <?php endforeach; endif; ?>
@@ -245,12 +285,8 @@ $stmt->execute(); $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC); $stmt->c
     <div class="mb-2"><label>Item Name</label><input name="item_name" class="form-control" required></div>
     <div class="mb-2"><label>Quantity</label><input type="number" name="quantity" class="form-control" value="0"></div>
     <div class="mb-2"><label>Supplier</label><input name="supplier" class="form-control"></div>
-    <div class="mb-2"><label>Condition</label>
-      <select name="condition" class="form-control"><option>Good</option><option>Broken</option><option>Damaged</option></select>
-    </div>
-    <div class="mb-2"><label>Status</label>
-      <select name="status" class="form-control"><option>Available</option><option>Unavailable</option></select>
-    </div>
+    <div class="mb-2"><label>Condition</label><select name="condition" class="form-control"><option>Good</option><option>Broken</option><option>Damaged</option></select></div>
+    <div class="mb-2"><label>Status</label><select name="status" class="form-control"><option>Available</option><option>Unavailable</option></select></div>
     <div class="mb-2"><label>Date Received</label><input type="date" name="date_received" class="form-control"></div>
     <button class="btn btn-primary">Save</button> <a href="equipment.php" class="btn btn-secondary">Cancel</a>
   </form>
@@ -303,37 +339,22 @@ endif;
   const submitBtn = document.getElementById('u_submit');
 
   function openModal() {
-    modal.classList.add('show');
-    body.classList.add('modal-open');
-    modal.setAttribute('aria-hidden','false');
-    const first = document.getElementById('u_item_name');
-    if(first) { setTimeout(()=> first.focus(),50); }
+    modal.classList.add('show'); body.classList.add('modal-open'); modal.setAttribute('aria-hidden','false');
+    const first = document.getElementById('u_item_name'); if(first) { setTimeout(()=> first.focus(),50); }
   }
   function closeModal() {
-    modal.classList.remove('show');
-    body.classList.remove('modal-open');
-    modal.setAttribute('aria-hidden','true');
-    const modeField = document.getElementById('mode_field');
-    if(modeField) modeField.value = 'add';
-    form.action = 'equipment.php?action=add';
-    title.textContent = 'Add Equipment';
-    submitBtn && (submitBtn.textContent = 'Save');
-    form.reset();
+    modal.classList.remove('show'); body.classList.remove('modal-open'); modal.setAttribute('aria-hidden','true');
+    const modeField = document.getElementById('mode_field'); if(modeField) modeField.value = 'add';
+    form.action = 'equipment.php?action=add'; title.textContent = 'Add Equipment'; submitBtn && (submitBtn.textContent = 'Save'); form.reset();
   }
 
   document.querySelectorAll('[data-close]').forEach(btn=> btn.addEventListener('click', ()=> closeModal()));
-
   modal.addEventListener('click', function(e){ if(e.target === this) closeModal(); });
 
   const openBtn = document.getElementById('openUnifiedBtn');
   if(openBtn) openBtn.addEventListener('click', function(e){
-    e.preventDefault();
-    form.reset();
-    title.textContent = 'Add Equipment';
-    form.action = 'equipment.php?action=add';
-    document.getElementById('mode_field').value = 'add';
-    submitBtn && (submitBtn.textContent = 'Save');
-    openModal();
+    e.preventDefault(); form.reset(); title.textContent = 'Add Equipment'; form.action = 'equipment.php?action=add';
+    document.getElementById('mode_field').value = 'add'; submitBtn && (submitBtn.textContent = 'Save'); openModal();
   });
 
   document.querySelectorAll('.openUnifiedEdit').forEach(btn=>{
@@ -359,29 +380,16 @@ endif;
   const urlParams = new URLSearchParams(window.location.search);
   const action = urlParams.get('action');
   if(action === 'add') {
-    form.reset();
-    form.action = 'equipment.php?action=add';
-    title.textContent = 'Add Equipment';
-    submitBtn && (submitBtn.textContent = 'Save');
-    openModal();
+    form.reset(); form.action = 'equipment.php?action=add'; title.textContent = 'Add Equipment'; submitBtn && (submitBtn.textContent = 'Save'); openModal();
   } else if(action === 'edit') {
     const id = urlParams.get('id');
     if(id) {
       const editBtn = document.querySelector('.openUnifiedEdit[data-id="'+id+'"]');
       if(editBtn) editBtn.click();
-      else {
-        form.reset();
-        form.action = 'equipment.php?action=edit&id=' + encodeURIComponent(id);
-        title.textContent = 'Edit Equipment';
-        submitBtn && (submitBtn.textContent = 'Update');
-        openModal();
-      }
+      else { form.reset(); form.action = 'equipment.php?action=edit&id=' + encodeURIComponent(id); title.textContent = 'Edit Equipment'; submitBtn && (submitBtn.textContent = 'Update'); openModal(); }
     }
   }
 
-  document.addEventListener('keydown', function(e){
-    if(e.key === 'Escape' && modal.classList.contains('show')) closeModal();
-  });
+  document.addEventListener('keydown', function(e){ if(e.key === 'Escape' && modal.classList.contains('show')) closeModal(); });
 })();
 </script>
-

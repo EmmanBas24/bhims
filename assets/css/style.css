@@ -121,11 +121,6 @@ body {
   box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
 }
 
-/* Footer tiny */
-footer {
-  color: #94a3b8;
-  padding: 18px 0;
-}
 
 /* Responsive tweak */
 @media (max-width: 900px) {

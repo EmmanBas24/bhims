@@ -49,50 +49,53 @@ if ($action === 'delete') {
     header('Location: supplies.php'); exit;
 }
 
-// Listing (default)
-$stmt = $mysqli->prepare('SELECT * FROM supplies ORDER BY date_received DESC, supply_id DESC');
-$stmt->execute(); $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC); $stmt->close();
+// Listing (with search + status filter to match medicine UI)
+$search = trim($_GET['search'] ?? '');
+$status_filter = $_GET['status'] ?? '';
+
+$sql = "SELECT * FROM supplies WHERE 1=1";
+$params = [];
+$types = '';
+if ($search !== '') { $sql .= " AND item_name LIKE ?"; $params[] = "%$search%"; $types .= 's'; }
+if ($status_filter !== '') { $sql .= " AND status = ?"; $params[] = $status_filter; $types .= 's'; }
+$sql .= " ORDER BY date_received DESC, supply_id DESC";
+
+$stmt = $mysqli->prepare($sql);
+if ($stmt === false) { die('Prepare failed: ' . $mysqli->error); }
+if (!empty($params)) { $stmt->bind_param($types, ...$params); }
+$stmt->execute();
+$rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+$stmt->close();
 ?>
 
-<!-- Styles: modal + table card + badges -->
+<!-- Page-specific styles (leave table-modern in style.css) -->
 <style>
-  /* container/card */
+  /* card container */
   .table-card {
     background: #fff;
     border-radius: 10px;
     padding: 1rem;
     box-shadow: 0 8px 24px rgba(0,0,0,0.06);
   }
-  .table-card h3 { margin-top:0; margin-bottom:.75rem; }
 
-  /* actions row */
   .d-flex { display:flex; }
   .justify-content-between { justify-content: space-between; }
-  .align-items-center { align-items: center; }
+  .align-items-center { align-items:center; }
   .mb-2 { margin-bottom:.5rem; }
   .btn { display:inline-flex; align-items:center; gap:.5rem; padding:.375rem .6rem; border-radius:6px; border:1px solid transparent; text-decoration:none; cursor:pointer; }
   .btn-sm { font-size:.85rem; padding:.275rem .5rem; border-radius:6px; }
   .btn-primary { background:#0d6efd; color:#fff; border-color:#0d6efd; }
   .btn-success { background:#198754; color:#fff; border-color:#198754; }
   .btn-secondary { background:#6c757d; color:#fff; border-color:#6c757d; }
-  .btn-danger { background:#dc3545; color:#fff; border-color:#dc3545; }
   .btn-outline-secondary { background:transparent; color:#495057; border-color:#ced4da; }
-
-  /* table */
-  .table { width:100%; border-collapse:collapse; font-size:.95rem; }
-  .table thead th { text-align:left; padding:.6rem .75rem; border-bottom:1px solid #e9ecef; color:#495057; font-weight:600; }
-  .table tbody td { padding:.6rem .75rem; border-bottom:1px solid #f1f3f5; vertical-align:middle; }
-  .table tr:hover td { background:#fbfdff; }
+  .btn-outline-danger { background:transparent; color:#dc3545; border:1px solid rgba(220,53,69,0.12); }
 
   /* badges */
   .badge-available { display:inline-block; padding:.25rem .5rem; border-radius:999px; background:#e6f4ea; color:#0b7a3a; font-weight:600; font-size:.82rem; }
   .badge-low { display:inline-block; padding:.25rem .5rem; border-radius:999px; background:#fff4e6; color:#b36b00; font-weight:600; font-size:.82rem; }
   .badge-out { display:inline-block; padding:.25rem .5rem; border-radius:999px; background:#ffecec; color:#c21c1c; font-weight:600; font-size:.82rem; }
 
-  /* responsive */
-  .table-responsive { overflow:auto; }
-
-  /* modal backdrop & panel (copied/adapted) */
+  /* modal backdrop & panel (no blur) */
   .modal-backdrops {
     position: fixed;
     inset: 0;
@@ -104,6 +107,7 @@ $stmt->execute(); $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC); $stmt->c
     padding: 1rem;
   }
   .modal-backdrops.show { display: flex; }
+
   .modal-panel {
     background: #fff;
     border-radius: 10px;
@@ -115,39 +119,52 @@ $stmt->execute(); $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC); $stmt->c
     max-height: 90vh;
     overflow: auto;
   }
+
   .modal-header { display:flex; justify-content:space-between; align-items:center; margin-bottom: .75rem; }
   .modal-title { font-weight:600; font-size:1.1rem; }
-  .modal-close { background:none; border:0; font-size:1.4rem; cursor:pointer; }
+  .modal-close { background:none; border:0; font-size:1.2rem; cursor:pointer; }
+
   .form-row { display:flex; gap:12px; flex-wrap:wrap; }
   .form-row .form-group { flex:1; min-width:180px; }
   .btn-modal { margin-right:8px; }
-  body.modal-open { overflow: hidden; }
 
-  /* small device tweaks */
-  @media (max-width:600px) { .modal-panel { padding: .75rem; border-radius:8px; } }
-  label { display:block; font-size:.9rem; margin-bottom:.25rem; color:#333; }
+  body.modal-open { overflow: hidden; } /* prevent background scroll */
+
   input.form-control, select.form-control { width:100%; padding:.45rem .5rem; border:1px solid #dfe3e6; border-radius:6px; }
+  label { display:block; font-size:.9rem; margin-bottom:.25rem; color:#333; }
+  @media (max-width:600px) { .modal-panel { padding: .75rem; border-radius:8px; } }
 </style>
 
-<h3 style="margin-bottom:.5rem;">Supplies</h3>
+<h3>Health Supplies</h3>
 
 <div class="table-card">
   <div class="d-flex justify-content-between align-items-center mb-2">
     <div class="table-actions">
-      <!-- Could add filters/search here if desired -->
+      <form class="d-flex" method="get" style="gap:8px; align-items:center;">
+        <input name="search" value="<?php echo htmlspecialchars($search) ?>" placeholder="Search supplies..." class="form-control form-control-sm" style="padding:.35rem .5rem;">
+        <select name="status" class="form-control form-control-sm" style="padding:.35rem .5rem;">
+          <option value="">All status</option>
+          <option value="Available" <?php if($status_filter==='Available') echo 'selected' ?>>Available</option>
+          <option value="Low Stock" <?php if($status_filter==='Low Stock') echo 'selected' ?>>Low Stock</option>
+          <option value="Out of Stock" <?php if($status_filter==='Out of Stock') echo 'selected' ?>>Out of Stock</option>
+        </select>
+        <button class="btn btn-sm btn-primary">Filter</button>
+        <a href="supplies.php" class="btn btn-sm btn-outline-secondary">Reset</a>
+      </form>
     </div>
 
     <div>
       <!-- JS intercepts this to open modal; fallback link kept for no-JS -->
-      <a id="openUnifiedBtn" href="supplies.php?action=add" class="btn btn-sm btn-success"><span>＋</span> Add Supply</a>
+      <a id="openUnifiedBtn" href="supplies.php?action=add" class="btn btn-sm btn-success"><span style="font-weight:700;">＋</span> Add Supply</a>
     </div>
   </div>
 
   <div class="table-responsive">
-    <table class="table table-sm">
+    <!-- use your global .table-modern styles from style.css -->
+    <table class="table table-modern w-100">
       <thead>
         <tr>
-          <th>Item Code</th>
+          <th>Code</th>
           <th>Name</th>
           <th>Qty</th>
           <th>Supplier</th>
@@ -191,8 +208,8 @@ $stmt->execute(); $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC); $stmt->c
                     $data_str .= ' data-'.$k.'="'.htmlspecialchars($v, ENT_QUOTES).'"';
                 }
               ?>
-              <a class="btn btn-sm btn-outline-secondary openUnifiedEdit" href="supplies.php?action=edit&id=<?php echo $r['supply_id'] ?>" <?php echo $data_str; ?> title="Edit">Edit</a>
-              <a class="btn btn-sm btn-danger" href="supplies.php?action=delete&id=<?php echo $r['supply_id'] ?>" onclick="return confirm('Delete?')">Delete</a>
+              <a class="btn btn-sm btn-outline-secondary openUnifiedEdit" href="supplies.php?action=edit&id=<?php echo $r['supply_id'] ?>" <?php echo $data_str; ?> title="Edit"><i class="bi bi-pencil"></i></a>
+              <a class="btn btn-sm btn-outline-danger" href="supplies.php?action=delete&id=<?php echo $r['supply_id'] ?>" onclick="return confirm('Delete?')"><i class="bi bi-trash"></i></a>
             </td>
           </tr>
         <?php endforeach; endif; ?>
@@ -258,7 +275,6 @@ $stmt->execute(); $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC); $stmt->c
 
 <!-- Non-JS fallback page forms (kept for progressive enhancement) -->
 <?php if ($action === 'add' && empty($_POST)): ?>
-  <!-- If user navigates to ?action=add without JS, show the same fields inline -->
   <h3 style="margin-top:1rem;">Add Supply (No JS)</h3>
   <form method="post">
     <div class="mb-2"><label>Item Code</label><input name="item_code" class="form-control"></div>
@@ -271,10 +287,11 @@ $stmt->execute(); $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC); $stmt->c
   </form>
 <?php endif; ?>
 
-<?php if ($action === 'edit' && $_SERVER['REQUEST_METHOD'] !== 'POST'): 
+<?php if ($action === 'edit' && $_SERVER['REQUEST_METHOD'] !== 'POST'):
     // fallback server-rendered edit page when JS is disabled or user directly navigates
     $id = intval($_GET['id'] ?? 0);
-    $stmt = $mysqli->prepare('SELECT * FROM supplies WHERE supply_id = ? LIMIT 1'); 
+    $stmt = $mysqli->prepare('SELECT * FROM supplies WHERE supply_id = ? LIMIT 1');
+    if ($stmt === false) { die('Prepare failed: ' . $mysqli->error); }
     $stmt->bind_param('i', $id); $stmt->execute(); $row = $stmt->get_result()->fetch_assoc(); $stmt->close();
     if ($row):
 ?>
@@ -326,7 +343,6 @@ endif;
     form.action = 'supplies.php?action=add';
     title.textContent = 'Add Supply';
     submitBtn.textContent = 'Save';
-    // optionally clear fields
     form.reset();
   }
 
@@ -355,7 +371,6 @@ endif;
     btn.addEventListener('click', function(e){
       e.preventDefault();
       const id = this.dataset.id;
-      // populate fields
       document.getElementById('u_item_code').value = this.dataset.item_code || '';
       document.getElementById('u_item_name').value = this.dataset.item_name || '';
       document.getElementById('u_quantity').value = this.dataset.quantity || 0;
@@ -363,7 +378,6 @@ endif;
       document.getElementById('u_status').value = this.dataset.status || 'Available';
       document.getElementById('u_date_received').value = this.dataset.date_received || '';
 
-      // set form action to include id
       form.action = 'supplies.php?action=edit&id=' + encodeURIComponent(id);
       document.getElementById('mode_field').value = 'edit';
       title.textContent = 'Edit Supply';
@@ -376,7 +390,6 @@ endif;
   const urlParams = new URLSearchParams(window.location.search);
   const action = urlParams.get('action');
   if(action === 'add') {
-    // open add modal
     form.reset();
     form.action = 'supplies.php?action=add';
     title.textContent = 'Add Supply';
@@ -387,9 +400,8 @@ endif;
     if(id) {
       const editBtn = document.querySelector('.openUnifiedEdit[data-id="'+id+'"]');
       if(editBtn) {
-        editBtn.click(); // will populate & open modal
+        editBtn.click();
       } else {
-        // row not found; open modal with action set (server may render inline edit)
         form.reset();
         form.action = 'supplies.php?action=edit&id=' + encodeURIComponent(id);
         title.textContent = 'Edit Supply';

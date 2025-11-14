@@ -62,17 +62,35 @@ if ($action === 'delete') {
 // Listing (with filters)
 $search = trim($_GET['search'] ?? '');
 $status_filter = $_GET['status'] ?? '';
+$category_filter = $_GET['category'] ?? ''; // <-- new category filter
 
 $sql = "SELECT * FROM medicine WHERE 1=1";
 $params = [];
 $types = '';
-if ($search !== '') { $sql .= " AND item_name LIKE ?"; $params[] = "%$search%"; $types .= 's'; }
-if ($status_filter !== '') { $sql .= " AND status = ?"; $params[] = $status_filter; $types .= 's'; }
+
+if ($search !== '') {
+    $sql .= " AND item_name LIKE ?";
+    $params[] = "%$search%";
+    $types .= 's';
+}
+if ($status_filter !== '') {
+    $sql .= " AND status = ?";
+    $params[] = $status_filter;
+    $types .= 's';
+}
+if ($category_filter !== '') {
+    $sql .= " AND category = ?";
+    $params[] = $category_filter;
+    $types .= 's';
+}
+
 $sql .= " ORDER BY updated_at DESC";
 
 $stmt = $mysqli->prepare($sql);
 if ($stmt === false) { die('Prepare failed: ' . $mysqli->error); }
-if (!empty($params)) { $stmt->bind_param($types, ...$params); }
+if (!empty($params)) {
+    $stmt->bind_param($types, ...$params);
+}
 $stmt->execute();
 $rows = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
@@ -128,6 +146,14 @@ $stmt->close();
     <div class="table-actions">
       <form class="d-flex" method="get" style="gap:8px;align-items:center;">
         <input name="search" value="<?php echo htmlspecialchars($search) ?>" placeholder="Search medicine..." class="form-control form-control-sm">
+        <!-- Category filter -->
+        <select name="category" class="form-control form-control-sm">
+          <option value="">All categories</option>
+          <?php foreach ($categories as $c): ?>
+            <option value="<?php echo htmlspecialchars($c) ?>" <?php if($category_filter===$c) echo 'selected' ?>><?php echo htmlspecialchars($c) ?></option>
+          <?php endforeach; ?>
+        </select>
+
         <select name="status" class="form-control form-control-sm">
           <option value="">All status</option>
           <option value="Available" <?php if($status_filter==='Available') echo 'selected' ?>>Available</option>
@@ -135,6 +161,7 @@ $stmt->close();
           <option value="Expired" <?php if($status_filter==='Expired') echo 'selected' ?>>Expired</option>
         </select>
         <button class="btn btn-sm btn-primary">Filter</button>
+        <!-- Reset should clear category too -->
         <a href="medicine.php" class="btn btn-sm btn-outline-secondary">Reset</a>
       </form>
     </div>
@@ -394,3 +421,5 @@ $stmt->close();
 })();
 </script>
 <style>
+/* add any additional page-specific styles below if needed */
+</style>
