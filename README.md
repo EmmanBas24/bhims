@@ -14,3 +14,16 @@ Notes:
 - Uses prepared statements and sessions.
 - Minimal implementation provided: lists, add/edit/delete for inventory, issuance, user management, logs, basic reports.
 - This is a local-only starter system. Customize and harden before production use.
+
+
+
+
+USER ACCOUNTS _ 
+
+HEAD BHW
+USER - aaron
+PASSWORD - 12345
+
+BHW
+USER - rein
+PASSWORD - 12345

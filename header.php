@@ -78,8 +78,6 @@ $current_role = $_SESSION['role'] ?? '';
      
 
       <li class="nav-item"><a class="nav-link <?php echo basename($_SERVER['PHP_SELF'])=='medicine.php' ? 'active':'' ?>" href="medicine.php"><i class="bi bi-capsule"></i> Medicine</a></li>
-      <li class="nav-item"><a class="nav-link <?php echo basename($_SERVER['PHP_SELF'])=='supplies.php' ? 'active':'' ?>" href="supplies.php"><i class="bi bi-box-seam"></i> Supplies</a></li>
-      <li class="nav-item"><a class="nav-link <?php echo basename($_SERVER['PHP_SELF'])=='equipment.php' ? 'active':'' ?>" href="equipment.php"> <i class="fi fi-sr-stethoscope"></i>Equipment</a></li>
       <li class="nav-item"><a class="nav-link <?php echo basename($_SERVER['PHP_SELF'])=='issuance.php' ? 'active':'' ?>" href="issuance.php"><i class="bi bi-send-fill"></i> Issuance</a></li>
 
       <?php if ($current_role === 'Head BHW'): ?>
